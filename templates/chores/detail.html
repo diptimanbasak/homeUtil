@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ chore.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/chores">Chores</a>
+    <span>›</span> {{ chore.name }}
+</div>
+
+<div class="page-header">
+    <div>
+        <h1>{{ chore.name }}</h1>
+        <p>{{ chore.category }} &mdash; {{ frequency_label }}</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/chores/{{ chore.id }}/edit" class="btn btn-outline">Edit</a>
+        <form method="post" action="/chores/{{ chore.id }}/deactivate"
+              onsubmit="return confirm('Archive this chore?');">
+            <button type="submit" class="btn btn-danger btn-sm">Archive</button>
+        </form>
+    </div>
+</div>
+
+<div class="info-grid mb-2">
+    <div class="info-item">
+        <label>Status</label>
+        <p>
+            {% if status == "overdue" %}
+                <span class="badge badge-overdue">Overdue</span>
+            {% elif status == "due_today" %}
+                <span class="badge badge-due_soon">Due Today</span>
+            {% else %}
+                <span class="badge badge-ok">On Track</span>
+            {% endif %}
+        </p>
+    </div>
+    <div class="info-item">
+        <label>Next Due</label>
+        <p>{{ next_due.strftime("%b %d, %Y") }}</p>
+    </div>
+    <div class="info-item">
+        <label>Last Completed</label>
+        <p>{{ last_completed.strftime("%b %d, %Y") if last_completed else "Never" }}</p>
+    </div>
+    <div class="info-item">
+        <label>Assigned To</label>
+        <p>{{ chore.assigned_to or "—" }}</p>
+    </div>
+</div>
+
+{% if chore.notes %}
+<div class="card mb-2">
+    <div class="card-title">Notes</div>
+    <p>{{ chore.notes }}</p>
+</div>
+{% endif %}
+
+<!-- Log completion -->
+<div class="section">
+    <div class="section-header">
+        <h2>Log Completion</h2>
+    </div>
+    <div class="card" style="max-width:480px;">
+        <form method="post" action="/chores/{{ chore.id }}/complete">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="completed_on">Date</label>
+                    <input type="date" id="completed_on" name="completed_on" class="form-control" value="{{ today }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="completed_by">Completed By</label>
+                    <input type="text" id="completed_by" name="completed_by" class="form-control"
+                           value="{{ chore.assigned_to or '' }}" placeholder="Who did it?">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="notes">Notes</label>
+                <input type="text" id="notes" name="notes" class="form-control" placeholder="Optional">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success">✓ Mark Done</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- History -->
+<div class="section">
+    <div class="section-header">
+        <h2>Completion History</h2>
+        <span class="text-muted text-sm">{{ logs|length }} entries</span>
+    </div>
+
+    {% if logs %}
+    <div class="card" style="padding:0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Completed By</th>
+                    <th>Notes</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+                <tr>
+                    <td>{{ log.completed_on.strftime("%b %d, %Y") }}</td>
+                    <td>{{ log.completed_by or "—" }}</td>
+                    <td>{{ log.notes or "—" }}</td>
+                    <td>
+                        <form method="post" action="/chores/{{ chore.id }}/logs/{{ log.id }}/delete"
+                              onsubmit="return confirm('Delete this log entry?');">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;">
+        <p>No completions logged yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

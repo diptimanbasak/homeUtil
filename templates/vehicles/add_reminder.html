@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Add Reminder &mdash; {{ vehicle.make }} {{ vehicle.model }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/vehicles">Vehicles</a>
+    <span>›</span> <a href="/vehicles/{{ vehicle.id }}">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</a>
+    <span>›</span> Add Reminder
+</div>
+
+<div class="page-header">
+    <h1>Add Reminder</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+    <form method="post" action="/vehicles/{{ vehicle.id }}/reminders/new">
+        <div class="form-group">
+            <label class="form-label" for="service_type">Service Type <span class="required">*</span></label>
+            <select id="service_type" name="service_type" class="form-control">
+                {% for type in service_types %}
+                <option value="{{ type }}">{{ type }}</option>
+                {% endfor %}
+            </select>
+            <div id="custom-type-row" class="custom-type-row">
+                <input type="text" name="custom_service_type" class="form-control" placeholder="Describe the service">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="due_date">Due Date</label>
+                <input type="date" id="due_date" name="due_date" class="form-control">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="due_mileage">Due Mileage</label>
+                <input type="number" id="due_mileage" name="due_mileage" class="form-control">
+            </div>
+        </div>
+        <p class="form-hint">Provide at least a due date or due mileage.</p>
+
+        <div class="form-group">
+            <label class="form-label" for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Any extra details..."></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Reminder</button>
+            <a href="/vehicles/{{ vehicle.id }}" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

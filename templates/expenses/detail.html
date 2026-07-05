@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ expense.vendor or "Expense" }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/expenses">Expenses</a>
+    <span>›</span> {{ expense.vendor or "Expense" }}
+</div>
+
+<div class="page-header">
+    <div>
+        <h1>{{ expense.vendor or "Unknown Vendor" }}</h1>
+        <p>{{ expense.expense_date.strftime('%B %d, %Y') if expense.expense_date else "No date" }}</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/expenses/{{ expense.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
+        <form method="post" action="/expenses/{{ expense.id }}/delete"
+              onsubmit="return confirm('Delete this expense?');">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+
+<div class="info-grid mb-2">
+    <div class="info-item">
+        <label>Amount</label>
+        <p class="total-figure">{{ expense.amount | currency }}</p>
+    </div>
+    <div class="info-item">
+        <label>Category</label>
+        <p>
+            {% if '+' in expense.category_label %}
+            <span class="category-badge" style="background:var(--color-bg);color:var(--color-text-muted);border:1px solid var(--color-border);">{{ expense.category_label }}</span>
+            {% else %}
+            <span class="category-badge" style="background:{{ category_colors.get(expense.category_label, '#94a3b8') }}22;color:{{ category_colors.get(expense.category_label, '#94a3b8') }};">{{ expense.category_label }}</span>
+            {% endif %}
+        </p>
+    </div>
+    {% if expense.returned_items %}
+    <div class="info-item">
+        <label>Net (after returns)</label>
+        <p class="total-figure">{{ expense.net_amount | currency }}</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if expense.notes %}
+<div class="card expense-card-hover mb-2">
+    <div class="card-title">Notes</div>
+    <p>{{ expense.notes }}</p>
+</div>
+{% endif %}
+
+{% if expense.items %}
+{% set returned_names = expense.returned_items | map(attribute='name') | list %}
+<div class="card expense-card-hover mb-2" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>#</th><th>Item</th><th>Category</th><th>Price</th></tr>
+            </thead>
+            <tbody>
+                {% for item in expense.items %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        {{ item.name }}
+                        {% if item.name in returned_names %}
+                        <span class="return-tag" title="Returned">R</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="/expenses/{{ expense.id }}/items/{{ item.id }}/category"
+                              style="display:flex;gap:0.4rem;align-items:center;">
+                            <select name="category" class="form-control" style="width:auto;padding:0.2rem 0.4rem;font-size:0.8rem;" onchange="this.form.requestSubmit()">
+                                {% for cat in categories %}
+                                <option value="{{ cat }}" {% if cat == item.category %}selected{% endif %}>{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td>{{ item.price | currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card expense-card-hover mb-2">
+    <div class="card-title">Returned Items</div>
+    {% if expense.returned_items %}
+    <div class="table-wrap mb-2">
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Date</th><th>Amount</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for ri in expense.returned_items %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>{{ ri.name }}</td>
+                    <td>{{ ri.returned_on.strftime('%b %d, %Y') if ri.returned_on else '—' }}</td>
+                    <td>{{ ri.amount | currency }}</td>
+                    <td>
+                        <form method="post" action="/expenses/{{ expense.id }}/returns/{{ ri.id }}/delete"
+                              onsubmit="return confirm('Remove this returned item?');">
+                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="form-hint mb-2">No items returned from this receipt.</p>
+    {% endif %}
+    <form method="post" action="/expenses/{{ expense.id }}/returns" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="return-name">Item</label>
+            <input type="text" id="return-name" name="name" class="form-control" placeholder="e.g. Milk" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="return-amount">Amount</label>
+            <input type="number" step="0.01" id="return-amount" name="amount" class="form-control" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="return-date">Date</label>
+            <input type="date" id="return-date" name="returned_on" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-outline">Add Return</button>
+    </form>
+</div>
+
+{% if expense.receipt_filename %}
+<div class="card expense-card-hover">
+    <div class="card-title">Receipt</div>
+    <a href="/expenses/{{ expense.id }}/receipt" target="_blank" rel="noopener">View receipt photo</a>
+</div>
+{% endif %}
+{% endblock %}

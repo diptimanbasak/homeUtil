@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ chore.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/chores">Chores</a>
+    <span>›</span> <a href="/chores/{{ chore.id }}">{{ chore.name }}</a>
+    <span>›</span> Edit
+</div>
+
+<div class="page-header">
+    <h1>Edit Chore</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+    <form method="post" action="/chores/{{ chore.id }}/edit">
+        <div class="form-group">
+            <label class="form-label" for="name">Chore Name <span class="required">*</span></label>
+            <input type="text" id="name" name="name" class="form-control" value="{{ chore.name }}" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="category">Category</label>
+                <select id="category" name="category" class="form-control">
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if cat == chore.category %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="frequency">Frequency</label>
+                <select id="frequency" name="frequency" class="form-control">
+                    {% for key, label in frequencies.items() %}
+                    <option value="{{ key }}" {% if key == chore.frequency %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="assigned_to">Assigned To</label>
+            <input type="text" id="assigned_to" name="assigned_to" class="form-control" value="{{ chore.assigned_to or '' }}">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3">{{ chore.notes or '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/chores/{{ chore.id }}" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

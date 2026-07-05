@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Chores{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Daily Chores</h1>
+        <p>Track and manage recurring household tasks.</p>
+    </div>
+    <a href="/chores/new" class="btn btn-primary">+ Add Chore</a>
+</div>
+
+{% if overdue_count or due_today_count %}
+<div class="stats-grid" style="grid-template-columns: repeat(3,1fr); margin-bottom:1.5rem;">
+    <div class="card">
+        <div class="card-title">Overdue</div>
+        <div class="card-value" style="color:var(--color-danger)">{{ overdue_count }}</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Due Today</div>
+        <div class="card-value" style="color:var(--color-warning)">{{ due_today_count }}</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Total Active</div>
+        <div class="card-value">{{ chore_data|length }}</div>
+    </div>
+</div>
+{% endif %}
+
+{% if chore_data %}
+<div class="card" style="padding:0;">
+    <table>
+        <thead>
+            <tr>
+                <th>Chore</th>
+                <th>Category</th>
+                <th>Frequency</th>
+                <th>Assigned To</th>
+                <th>Next Due</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in chore_data %}
+            <tr>
+                <td>
+                    <a href="/chores/{{ item.chore.id }}" style="font-weight:600;color:var(--color-primary);text-decoration:none;">
+                        {{ item.chore.name }}
+                    </a>
+                </td>
+                <td><span class="chore-category">{{ item.chore.category }}</span></td>
+                <td>{{ item.frequency_label }}</td>
+                <td>{{ item.chore.assigned_to or "—" }}</td>
+                <td class="{% if item.status == 'overdue' %}text-danger{% elif item.status == 'due_today' %}text-warning{% endif %}">
+                    {% if item.status == "overdue" %}
+                        <strong>{{ item.next_due.strftime("%b %d") }}</strong>
+                    {% else %}
+                        {{ item.next_due.strftime("%b %d") }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.status == "overdue" %}
+                        <span class="badge badge-overdue">Overdue</span>
+                    {% elif item.status == "due_today" %}
+                        <span class="badge badge-due_soon">Due Today</span>
+                    {% else %}
+                        <span class="badge badge-ok">OK</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="post" action="/chores/{{ item.chore.id }}/complete" style="display:inline;">
+                        <input type="hidden" name="completed_on" value="{{ today.isoformat() }}">
+                        <button type="submit" class="btn btn-success btn-sm">✓ Done</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No chores yet</h3>
+    <p>Add your first recurring household chore to start tracking.</p>
+    <a href="/chores/new" class="btn btn-primary">Add First Chore</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Expenses</h1>
+        <p class="total-figure">{{ total | currency }}</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/expenses/report" class="btn btn-outline">Report</a>
+        <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+    </div>
+</div>
+
+{% if expenses %}
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Vendor</th><th>Category</th><th>Amount</th></tr>
+            </thead>
+            <tbody>
+                {% for e in expenses %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};cursor:pointer;" onclick="window.location='/expenses/{{ e.id }}'">
+                    <td>{{ e.expense_date.strftime('%b %d, %Y') if e.expense_date else '—' }}</td>
+                    <td>
+                        {{ e.vendor or '—' }}
+                        {% if e.returned_items %}
+                        <span class="return-tag" title="Has a return">R</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if '+' in e.category_label %}
+                        <span class="category-badge" style="background:var(--color-bg);color:var(--color-text-muted);border:1px solid var(--color-border);">{{ e.category_label }}</span>
+                        {% else %}
+                        <span class="category-badge" style="background:{{ category_colors.get(e.category_label, '#94a3b8') }}22;color:{{ category_colors.get(e.category_label, '#94a3b8') }};">{{ e.category_label }}</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ e.amount | currency }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No expenses yet</h3>
+    <p>Scan a receipt photo to automatically log an expense.</p>
+    <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Overview of your home utilities</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="card">
+        <div class="card-title">Total Vehicles</div>
+        <div class="card-value">{{ vehicles | length }}</div>
+    </div>
+    <div class="card" style="border-left: 4px solid #ffc107;">
+        <div class="card-title">Due Soon</div>
+        <div class="card-value">{{ due_soon | length }}</div>
+        <p class="text-sm text-muted">Next 30 days / 500 miles</p>
+    </div>
+    <div class="card" style="border-left: 4px solid #dc3545;">
+        <div class="card-title">Overdue</div>
+        <div class="card-value" {% if overdue %}style="color: var(--color-danger);"{% endif %}>{{ overdue | length }}</div>
+        <p class="text-sm text-muted">Action needed</p>
+    </div>
+</div>
+
+{% if overdue %}
+<div class="section">
+    <div class="section-header">
+        <h2>Overdue Maintenance</h2>
+        <span class="badge badge-overdue">{{ overdue | length }} item{{ "s" if overdue | length != 1 }}</span>
+    </div>
+    <div class="card">
+        {% for item in overdue %}
+        <div class="reminder-item">
+            <div class="reminder-info">
+                <h4>{{ item.vehicle.year }} {{ item.vehicle.make }} {{ item.vehicle.model }}{% if item.vehicle.nickname %} ({{ item.vehicle.nickname }}){% endif %} &mdash; {{ item.reminder.service_type }}</h4>
+                <p>
+                    {% if item.reminder.due_date %}Due date: {{ item.reminder.due_date.strftime('%B %d, %Y') }}{% endif %}
+                    {% if item.reminder.due_date and item.reminder.due_mileage %} &middot; {% endif %}
+                    {% if item.reminder.due_mileage %}Due at: {{ item.reminder.due_mileage | number }} mi{% endif %}
+                </p>
+            </div>
+            <a href="/vehicles/{{ item.vehicle.id }}" class="btn btn-sm btn-outline">View</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if due_soon %}
+<div class="section">
+    <div class="section-header">
+        <h2>Coming Up</h2>
+        <span class="badge badge-due_soon">{{ due_soon | length }} item{{ "s" if due_soon | length != 1 }}</span>
+    </div>
+    <div class="card">
+        {% for item in due_soon %}
+        <div class="reminder-item">
+            <div class="reminder-info">
+                <h4>{{ item.vehicle.year }} {{ item.vehicle.make }} {{ item.vehicle.model }}{% if item.vehicle.nickname %} ({{ item.vehicle.nickname }}){% endif %} &mdash; {{ item.reminder.service_type }}</h4>
+                <p>
+                    {% if item.reminder.due_date %}Due: {{ item.reminder.due_date.strftime('%B %d, %Y') }}{% endif %}
+                    {% if item.reminder.due_mileage %}{% if item.reminder.due_date %} &middot; {% endif %}Due at {{ item.reminder.due_mileage | number }} mi{% endif %}
+                </p>
+            </div>
+            <a href="/vehicles/{{ item.vehicle.id }}" class="btn btn-sm btn-outline">View</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if not overdue and not due_soon and vehicles %}
+<div class="alert alert-success">All vehicle maintenance is up to date.</div>
+{% endif %}
+
+{% if chores_overdue or chores_due_today %}
+<div class="section">
+    <div class="section-header">
+        <h2>Chores Needing Attention</h2>
+        <a href="/chores" class="btn btn-sm btn-outline">View All Chores</a>
+    </div>
+    <div class="card">
+        {% for chore in chores_overdue %}
+        <div class="reminder-item">
+            <div class="reminder-info">
+                <h4>{{ chore.name }}</h4>
+                <p>{{ chore.category }} &mdash; {{ chore.frequency.replace("_", " ").title() }} &mdash; overdue since {{ chore.next_due().strftime("%b %d") }}</p>
+            </div>
+            <div class="reminder-actions">
+                <form method="post" action="/chores/{{ chore.id }}/complete" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm">✓ Done</button>
+                </form>
+                <span class="badge badge-overdue">Overdue</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% for chore in chores_due_today %}
+        <div class="reminder-item">
+            <div class="reminder-info">
+                <h4>{{ chore.name }}</h4>
+                <p>{{ chore.category }} &mdash; {{ chore.frequency.replace("_", " ").title() }} &mdash; due today</p>
+            </div>
+            <div class="reminder-actions">
+                <form method="post" action="/chores/{{ chore.id }}/complete" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm">✓ Done</button>
+                </form>
+                <span class="badge badge-due_soon">Due Today</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if recent_services %}
+<div class="section">
+    <div class="section-header"><h2>Recent Service Activity</h2></div>
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Vehicle</th><th>Service</th><th>Mileage</th><th>Cost</th></tr>
+                </thead>
+                <tbody>
+                    {% for record in recent_services %}
+                    <tr>
+                        <td>{{ record.service_date.strftime('%b %d, %Y') }}</td>
+                        <td><a href="/vehicles/{{ record.vehicle_id }}">{{ record.vehicle.year }} {{ record.vehicle.make }} {{ record.vehicle.model }}</a></td>
+                        <td>{{ record.service_type }}</td>
+                        <td>{{ record.mileage_at_service | number }}{% if record.mileage_at_service %} mi{% endif %}</td>
+                        <td>{{ record.cost | currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not vehicles %}
+<div class="empty-state">
+    <h3>Welcome to HomeUtil</h3>
+    <p>Start by adding a vehicle to track its maintenance history and set up reminders.</p>
+    <a href="/vehicles/new" class="btn btn-primary">Add Your First Vehicle</a>
+</div>
+{% endif %}
+{% endblock %}

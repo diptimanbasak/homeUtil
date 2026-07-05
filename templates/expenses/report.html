@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Expense Report{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/expenses">Expenses</a>
+    <span>›</span> Report
+</div>
+
+<div class="page-header">
+    <div>
+        <h1>Spending by Category</h1>
+        <p class="total-figure">{{ grand_total | currency }}</p>
+    </div>
+</div>
+
+{% if breakdown %}
+<div class="card expense-card-hover mb-2" style="display:flex;gap:2.5rem;flex-wrap:wrap;align-items:center;">
+    <svg width="200" height="200" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="{{ radius }}" fill="none" stroke="var(--color-border)" stroke-width="30" />
+        {% for slice in slices %}
+        <circle class="pie-slice" data-index="{{ loop.index0 }}" cx="100" cy="100" r="{{ radius }}" fill="none" stroke="{{ slice.color }}"
+                stroke-dasharray="{{ slice.dasharray }}" stroke-dashoffset="{{ slice.dashoffset }}"
+                transform="rotate(-90 100 100)">
+            <title>{{ slice.label }}: {{ slice.amount | currency }} ({{ "%.1f"|format(slice.pct) }}%)</title>
+        </circle>
+        {% endfor %}
+    </svg>
+
+    <div style="display:flex;flex-direction:column;gap:0.15rem;">
+        {% for slice in slices %}
+        <div class="legend-item" data-index="{{ loop.index0 }}">
+            <span class="legend-swatch" style="background:{{ slice.color }};"></span>
+            <span>{{ slice.label }}</span>
+            <span style="color:var(--color-text-muted);">{{ slice.amount | currency }} ({{ "%.1f"|format(slice.pct) }}%)</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll(".legend-item").forEach(function (item) {
+        var slice = document.querySelector('.pie-slice[data-index="' + item.dataset.index + '"]');
+        item.addEventListener("mouseenter", function () { slice.classList.add("legend-active"); });
+        item.addEventListener("mouseleave", function () { slice.classList.remove("legend-active"); });
+    });
+</script>
+
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Category</th><th>Total</th><th>Share</th></tr>
+            </thead>
+            <tbody>
+                {% for category, amount in breakdown %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>
+                        <span class="category-badge" style="background:{{ category_colors.get(category, '#94a3b8') }}22;color:{{ category_colors.get(category, '#94a3b8') }};">{{ category }}</span>
+                    </td>
+                    <td><strong>{{ amount | currency }}</strong></td>
+                    <td>{{ "%.1f"|format(amount / grand_total * 100) if grand_total else "0.0" }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No expenses yet</h3>
+    <p>Once you've tracked some expenses, their category breakdown shows up here.</p>
+    <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+</div>
+{% endif %}
+{% endblock %}

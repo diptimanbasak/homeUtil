@@ -1,0 +1,13 @@
+[Unit]
+Description=HomeUtil
+After=network.target
+
+[Service]
+User={{APP_USER}}
+WorkingDirectory={{APP_DIR}}
+ExecStart={{APP_DIR}}/.venv/bin/python main.py
+Restart=on-failure
+Environment=PORT={{PORT}}
+
+[Install]
+WantedBy=multi-user.target

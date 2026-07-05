@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} — HomeUtil</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="sidebar-brand"><a href="/">HomeUtil</a></div>
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <a href="/" class="sidebar-link {% if request.path == '/' %}active{% endif %}">Dashboard</a>
+                    <a href="/vehicles" class="sidebar-link {% if request.path.startswith('/vehicles') %}active{% endif %}">Vehicle Maintenance</a>
+                    <a href="/chores" class="sidebar-link {% if request.path.startswith('/chores') %}active{% endif %}">Chores</a>
+                    <a href="/expenses" class="sidebar-link {% if request.path.startswith('/expenses') %}active{% endif %}">Expenses</a>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Coming Soon</div>
+                    <span class="sidebar-link disabled">Home Network</span>
+                    <span class="sidebar-link disabled">Kids Classes</span>
+                    <span class="sidebar-link disabled">Events</span>
+                    <span class="sidebar-link disabled">Birthdays</span>
+                    <span class="sidebar-link disabled">Doctor Appointments</span>
+                </div>
+            </nav>
+        </aside>
+
+        <div class="app-body">
+            <main class="main-content">
+                {% block content %}{% endblock %}
+            </main>
+
+            <footer class="footer">
+                <p>HomeUtil &mdash; personal home management</p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // Reveal the free-text "custom service type" field when the
+        // service-type dropdown is set to "Other".
+        document.addEventListener("DOMContentLoaded", function () {
+            var typeSelect = document.getElementById("service_type");
+            var customRow = document.getElementById("custom-type-row");
+            if (typeSelect && customRow) {
+                var sync = function () {
+                    customRow.classList.toggle("visible", typeSelect.value === "Other");
+                };
+                typeSelect.addEventListener("change", sync);
+                sync();
+            }
+        });
+    </script>
+</body>
+</html>

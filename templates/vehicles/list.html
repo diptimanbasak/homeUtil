@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Vehicles{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Vehicles</h1>
+        <p>All vehicles you're tracking</p>
+    </div>
+    <a href="/vehicles/new" class="btn btn-primary">Add Vehicle</a>
+</div>
+
+{% if vehicle_data %}
+<div class="vehicle-grid">
+    {% for item in vehicle_data %}
+    <a href="/vehicles/{{ item.vehicle.id }}" class="vehicle-card">
+        <div class="vehicle-card-header">
+            <div>
+                <div class="vehicle-name">{{ item.vehicle.year }} {{ item.vehicle.make }} {{ item.vehicle.model }}</div>
+                {% if item.vehicle.nickname %}<div class="vehicle-subtitle">{{ item.vehicle.nickname }}</div>{% endif %}
+            </div>
+            <span class="badge badge-{{ item.status }}">{{ item.status.replace("_", " ") }}</span>
+        </div>
+        <div class="vehicle-meta">
+            <span><strong>{{ item.vehicle.current_mileage | number }}</strong> mi</span>
+            {% if item.last_service %}<span>Last service: <strong>{{ item.last_service.service_date.strftime('%b %d, %Y') }}</strong></span>{% endif %}
+            <span><strong>{{ item.active_reminder_count }}</strong> active reminder{{ "s" if item.active_reminder_count != 1 }}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No vehicles yet</h3>
+    <p>Add a vehicle to start tracking its maintenance history.</p>
+    <a href="/vehicles/new" class="btn btn-primary">Add Vehicle</a>
+</div>
+{% endif %}
+{% endblock %}

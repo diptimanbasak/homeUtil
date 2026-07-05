@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/vehicles">Vehicles</a>
+    <span>›</span> {{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}
+</div>
+
+<div class="page-header">
+    <div>
+        <h1>{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</h1>
+        {% if vehicle.nickname %}<p>{{ vehicle.nickname }}</p>{% endif %}
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/vehicles/{{ vehicle.id }}/edit" class="btn btn-outline">Edit</a>
+        <form method="post" action="/vehicles/{{ vehicle.id }}/delete"
+              onsubmit="return confirm('Delete this vehicle and all its history?');">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+
+<div class="info-grid mb-2">
+    <div class="info-item">
+        <label>Current Mileage</label>
+        <p>{{ vehicle.current_mileage | number }} mi</p>
+    </div>
+    <div class="info-item">
+        <label>License Plate</label>
+        <p>{{ vehicle.license_plate or "—" }}</p>
+    </div>
+    <div class="info-item">
+        <label>VIN</label>
+        <p>{{ vehicle.vin or "—" }}</p>
+    </div>
+    <div class="info-item">
+        <label>Color</label>
+        <p>{{ vehicle.color or "—" }}</p>
+    </div>
+</div>
+
+{% if vehicle.notes %}
+<div class="card mb-2">
+    <div class="card-title">Notes</div>
+    <p>{{ vehicle.notes }}</p>
+</div>
+{% endif %}
+
+<!-- Reminders -->
+<div class="section">
+    <div class="section-header">
+        <h2>Maintenance Reminders</h2>
+        <a href="/vehicles/{{ vehicle.id }}/reminders/new" class="btn btn-sm btn-outline">Add Reminder</a>
+    </div>
+
+    {% if active_reminders %}
+    <div class="card">
+        {% for item in active_reminders %}
+        <div class="reminder-item">
+            <div class="reminder-info">
+                <h4>{{ item.reminder.service_type }}</h4>
+                <p>
+                    {% if item.reminder.due_date %}Due: {{ item.reminder.due_date.strftime('%B %d, %Y') }}{% endif %}
+                    {% if item.reminder.due_mileage %}{% if item.reminder.due_date %} &middot; {% endif %}Due at {{ item.reminder.due_mileage | number }} mi{% endif %}
+                </p>
+            </div>
+            <div class="reminder-actions">
+                <span class="badge badge-{{ item.status }}">{{ item.status.replace("_", " ") }}</span>
+                <form method="post" action="/vehicles/{{ vehicle.id }}/reminders/{{ item.reminder.id }}/complete" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm">✓ Done</button>
+                </form>
+                <a href="/vehicles/{{ vehicle.id }}/reminders/{{ item.reminder.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
+                <form method="post" action="/vehicles/{{ vehicle.id }}/reminders/{{ item.reminder.id }}/delete"
+                      onsubmit="return confirm('Delete this reminder?');" style="display:inline;">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;">
+        <p>No active reminders.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Service history -->
+<div class="section">
+    <div class="section-header">
+        <h2>Service History</h2>
+        <a href="/vehicles/{{ vehicle.id }}/services/new" class="btn btn-sm btn-outline">Log Service</a>
+    </div>
+
+    {% if records %}
+    <div class="card" style="padding:0;">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Service</th>
+                        <th>Mileage</th>
+                        <th>Cost</th>
+                        <th>Provider</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for record in records %}
+                    <tr>
+                        <td>{{ record.service_date.strftime("%b %d, %Y") }}</td>
+                        <td>{{ record.service_type }}</td>
+                        <td>{{ record.mileage_at_service | number }}{% if record.mileage_at_service %} mi{% endif %}</td>
+                        <td>{{ record.cost | currency }}</td>
+                        <td>{{ record.service_provider or "—" }}</td>
+                        <td>{{ record.notes or "—" }}</td>
+                        <td>
+                            <form method="post" action="/vehicles/{{ vehicle.id }}/services/{{ record.id }}/delete"
+                                  onsubmit="return confirm('Delete this service record?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;">
+        <p>No service history logged yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
