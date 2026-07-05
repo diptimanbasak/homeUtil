@@ -137,6 +137,7 @@
 <div class="card expense-card-hover">
     <div class="card-title">Receipt</div>
     <a href="/expenses/{{ expense.id }}/receipt" target="_blank" rel="noopener">View receipt photo</a>
+    <span class="form-hint" style="margin-left:0.5rem;">({{ expense.receipt_filename }})</span>
 </div>
 {% endif %}
 {% endblock %}

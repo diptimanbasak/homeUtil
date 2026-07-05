@@ -15,6 +15,15 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
+{% if last_expense %}
+<div class="alert" style="max-width:600px;background:var(--color-bg);border:1px solid var(--color-border);">
+    Last receipt uploaded: <a href="/expenses/{{ last_expense.id }}">{{ last_expense.vendor or "Unknown Vendor" }}
+    &mdash; {{ last_expense.amount | currency }}
+    ({{ last_expense.expense_date.strftime('%b %d, %Y') if last_expense.expense_date else 'no date' }})</a>.
+    Check it isn't the same receipt before scanning another.
+</div>
+{% endif %}
+
 <div class="card" style="max-width:600px;">
     <form method="post" action="/expenses/new" enctype="multipart/form-data" id="receipt-form">
         <div class="form-group">

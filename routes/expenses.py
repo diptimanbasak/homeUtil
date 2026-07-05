@@ -1,5 +1,6 @@
 """Expenses module: track spending by scanning receipt photos."""
 import datetime
+import itertools
 import math
 import uuid
 from collections import defaultdict
@@ -25,21 +26,70 @@ def get_expense_or_404(expense_id: int, db) -> Expense:
     return expense
 
 
+def _apply_filters(query, args):
+    """Shared date/category/vendor filtering for the list and report pages,
+    both driven by the same GET query params so a link from one to the
+    other (with filters intact) is a plain query-string carryover."""
+    date_from = args.get("date_from", "")
+    date_to = args.get("date_to", "")
+    category = args.get("category", "")
+    vendor = args.get("vendor", "").strip()
+
+    if date_from:
+        try:
+            query = query.filter(Expense.expense_date >= datetime.date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            query = query.filter(Expense.expense_date <= datetime.date.fromisoformat(date_to))
+        except ValueError:
+            pass
+    if category in EXPENSE_CATEGORIES:
+        query = query.filter(Expense.category == category)
+    if vendor:
+        query = query.filter(Expense.vendor.ilike(f"%{vendor}%"))
+
+    return query
+
+
+def _month_group(expense: Expense) -> str:
+    if not expense.expense_date:
+        return "No Date"
+    return expense.expense_date.strftime("%B %Y")
+
+
 # ------------------------------------------------------------------ list
 
 @bp.route("/")
 def list_expenses():
     db = get_db()
-    expenses = db.query(Expense).order_by(Expense.expense_date.desc().nullslast()).all()
+    query = _apply_filters(db.query(Expense), request.args)
+    expenses = query.order_by(Expense.expense_date.desc().nullslast()).all()
     total = sum(e.amount for e in expenses if e.amount)
-    return render_template("expenses/list.html", expenses=expenses, total=total)
+
+    months = [(label, list(group)) for label, group in itertools.groupby(expenses, key=_month_group)]
+
+    return render_template(
+        "expenses/list.html",
+        expenses=expenses,
+        months=months,
+        total=total,
+        categories=EXPENSE_CATEGORIES,
+        filters=request.args,
+    )
 
 
 # ------------------------------------------------------------------ upload + analyze
 
+def _last_uploaded_expense(db):
+    return db.query(Expense).order_by(Expense.created_at.desc()).first()
+
+
 @bp.route("/new", methods=["GET"])
 def add_expense_form():
-    return render_template("expenses/add_expense.html", error=None)
+    db = get_db()
+    return render_template("expenses/add_expense.html", error=None, last_expense=_last_uploaded_expense(db))
 
 
 @bp.route("/new", methods=["POST"])
@@ -49,7 +99,7 @@ def create_expense():
 
     if not photo or not photo.filename:
         return render_template(
-            "expenses/add_expense.html", error="Please choose a receipt photo."
+            "expenses/add_expense.html", error="Please choose a receipt photo.", last_expense=_last_uploaded_expense(db)
         ), 400
 
     image_bytes = photo.read()
@@ -254,7 +304,7 @@ def delete_returned_item(expense_id, return_id):
 @bp.route("/report")
 def category_report():
     db = get_db()
-    expenses = db.query(Expense).all()
+    expenses = _apply_filters(db.query(Expense), request.args).all()
 
     # Grouped by each item's own category, like the detail page shows, so a
     # receipt spanning multiple categories (see Expense.category_label)
@@ -313,4 +363,6 @@ def category_report():
         slices=slices,
         radius=radius,
         circumference=circumference,
+        categories=EXPENSE_CATEGORIES,
+        filters=request.args,
     )

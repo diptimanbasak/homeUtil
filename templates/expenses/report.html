@@ -14,6 +14,34 @@
     </div>
 </div>
 
+<form method="get" action="/expenses/report" class="card mb-2" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="date_from">From</label>
+        <input type="date" id="date_from" name="date_from" class="form-control" value="{{ filters.get('date_from', '') }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="date_to">To</label>
+        <input type="date" id="date_to" name="date_to" class="form-control" value="{{ filters.get('date_to', '') }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="category">Category</label>
+        <select id="category" name="category" class="form-control">
+            <option value="">All</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if filters.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="vendor">Vendor</label>
+        <input type="text" id="vendor" name="vendor" class="form-control" placeholder="e.g. Target" value="{{ filters.get('vendor', '') }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Generate Report</button>
+    {% if filters %}
+    <a href="/expenses/report" class="btn btn-outline">Clear</a>
+    {% endif %}
+</form>
+
 {% if breakdown %}
 <div class="card expense-card-hover mb-2" style="display:flex;gap:2.5rem;flex-wrap:wrap;align-items:center;">
     <svg width="200" height="200" viewBox="0 0 200 200">
@@ -68,9 +96,14 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <h3>No expenses yet</h3>
+    <h3>No expenses{{ " match these filters" if filters else " yet" }}</h3>
+    {% if filters %}
+    <p>Try widening the date range or clearing a filter.</p>
+    <a href="/expenses/report" class="btn btn-outline">Clear filters</a>
+    {% else %}
     <p>Once you've tracked some expenses, their category breakdown shows up here.</p>
     <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

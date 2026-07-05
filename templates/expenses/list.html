@@ -8,12 +8,46 @@
         <p class="total-figure">{{ total | currency }}</p>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/expenses/report" class="btn btn-outline">Report</a>
+        <a href="/expenses/report{{ '?' + filters|urlencode if filters }}" class="btn btn-outline">Report</a>
         <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
     </div>
 </div>
 
+<form method="get" action="/expenses" class="card mb-2" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="date_from">From</label>
+        <input type="date" id="date_from" name="date_from" class="form-control" value="{{ filters.get('date_from', '') }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="date_to">To</label>
+        <input type="date" id="date_to" name="date_to" class="form-control" value="{{ filters.get('date_to', '') }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="category">Category</label>
+        <select id="category" name="category" class="form-control">
+            <option value="">All</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if filters.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="vendor">Vendor</label>
+        <input type="text" id="vendor" name="vendor" class="form-control" placeholder="e.g. Target" value="{{ filters.get('vendor', '') }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if filters %}
+    <a href="/expenses" class="btn btn-outline">Clear</a>
+    {% endif %}
+</form>
+
 {% if expenses %}
+{% for month_label, month_expenses in months %}
+<div class="card-title" style="margin-top:1.5rem;">{{ month_label }}
+    <span style="font-weight:normal;color:var(--color-text-muted);">
+        ({{ (month_expenses | selectattr('amount') | map(attribute='amount') | sum) | currency }})
+    </span>
+</div>
 <div class="card expense-card-hover" style="padding:0;">
     <div class="table-wrap">
         <table>
@@ -21,7 +55,7 @@
                 <tr><th>Date</th><th>Vendor</th><th>Category</th><th>Amount</th></tr>
             </thead>
             <tbody>
-                {% for e in expenses %}
+                {% for e in month_expenses %}
                 <tr class="expense-row" style="--i:{{ loop.index0 }};cursor:pointer;" onclick="window.location='/expenses/{{ e.id }}'">
                     <td>{{ e.expense_date.strftime('%b %d, %Y') if e.expense_date else '—' }}</td>
                     <td>
@@ -44,11 +78,17 @@
         </table>
     </div>
 </div>
+{% endfor %}
 {% else %}
 <div class="empty-state">
-    <h3>No expenses yet</h3>
+    <h3>No expenses{{ " match these filters" if filters else " yet" }}</h3>
+    {% if filters %}
+    <p>Try widening the date range or clearing a filter.</p>
+    <a href="/expenses" class="btn btn-outline">Clear filters</a>
+    {% else %}
     <p>Scan a receipt photo to automatically log an expense.</p>
     <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}
