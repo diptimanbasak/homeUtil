@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from config import REMINDER_DUE_SOON_DAYS, REMINDER_DUE_SOON_MILES
 from database import get_db
-from models import Chore, MaintenanceRecord, Vehicle
+from models import Chore, Expense, MaintenanceRecord, Vehicle
 
 bp = Blueprint("dashboard", __name__)
 
@@ -61,6 +61,19 @@ def dashboard():
     chores_overdue = [c for c in active_chores if c.status(today) == "overdue"]
     chores_due_today = [c for c in active_chores if c.status(today) == "due_today"]
 
+    recent_expenses = (
+        db.query(Expense)
+        .order_by(Expense.expense_date.desc().nullslast(), Expense.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    month_expenses = (
+        db.query(Expense)
+        .filter(Expense.expense_date >= today.replace(day=1))
+        .all()
+    )
+    month_total = sum(e.amount for e in month_expenses if e.amount)
+
     return render_template(
         "dashboard.html",
         vehicles=vehicles,
@@ -69,4 +82,6 @@ def dashboard():
         recent_services=recent_services,
         chores_overdue=chores_overdue,
         chores_due_today=chores_due_today,
+        recent_expenses=recent_expenses,
+        month_total=month_total,
     )

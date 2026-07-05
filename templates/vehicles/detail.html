@@ -61,6 +61,7 @@
             <div class="reminder-info">
                 <h4>{{ item.reminder.service_type }}</h4>
                 <p>
+                    {% if item.reminder.last_service_date %}Last service: {{ item.reminder.last_service_date.strftime('%B %d, %Y') }} &middot; {% endif %}
                     {% if item.reminder.due_date %}Due: {{ item.reminder.due_date.strftime('%B %d, %Y') }}{% endif %}
                     {% if item.reminder.due_mileage %}{% if item.reminder.due_date %} &middot; {% endif %}Due at {{ item.reminder.due_mileage | number }} mi{% endif %}
                 </p>
@@ -118,8 +119,9 @@
                         <td>{{ record.service_provider or "—" }}</td>
                         <td>{{ record.notes or "—" }}</td>
                         <td>
+                            <a href="/vehicles/{{ vehicle.id }}/services/{{ record.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
                             <form method="post" action="/vehicles/{{ vehicle.id }}/services/{{ record.id }}/delete"
-                                  onsubmit="return confirm('Delete this service record?');">
+                                  onsubmit="return confirm('Delete this service record?');" style="display:inline;">
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                             </form>
                         </td>

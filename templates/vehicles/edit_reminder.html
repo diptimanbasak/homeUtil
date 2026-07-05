@@ -30,6 +30,11 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label class="form-label" for="last_service_date">Date of Last Service</label>
+            <input type="date" id="last_service_date" name="last_service_date" class="form-control" value="{{ reminder.last_service_date.isoformat() if reminder.last_service_date else '' }}">
+        </div>
+
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label" for="due_date">Due Date</label>

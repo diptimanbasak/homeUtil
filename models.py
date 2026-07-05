@@ -64,6 +64,7 @@ class MaintenanceReminder(Base):
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     service_type = Column(String(100), nullable=False)
+    last_service_date = Column(Date)
     due_date = Column(Date)
     due_mileage = Column(Integer)
     is_completed = Column(Boolean, default=False)

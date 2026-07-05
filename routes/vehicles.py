@@ -42,6 +42,17 @@ def resolve_service_type(service_type: str, custom_service_type: str) -> str:
     return service_type
 
 
+def get_service_record_or_404(vehicle_id: int, service_id: int, db: Session) -> MaintenanceRecord:
+    record = (
+        db.query(MaintenanceRecord)
+        .filter(MaintenanceRecord.id == service_id, MaintenanceRecord.vehicle_id == vehicle_id)
+        .first()
+    )
+    if not record:
+        abort(404, description="Service record not found")
+    return record
+
+
 def get_reminder_or_404(vehicle_id: int, reminder_id: int, db: Session) -> MaintenanceReminder:
     reminder = (
         db.query(MaintenanceReminder)
@@ -268,16 +279,73 @@ def create_service_record(vehicle_id):
     return redirect(f"/vehicles/{vehicle_id}", code=303)
 
 
+@bp.route("/<int:vehicle_id>/services/<int:service_id>/edit", methods=["GET"])
+def edit_service_form(vehicle_id, service_id):
+    db = get_db()
+    vehicle = get_vehicle_or_404(vehicle_id, db)
+    record = get_service_record_or_404(vehicle_id, service_id, db)
+    selected_type, custom_service_type = reminder_type_fields(record)
+
+    return render_template(
+        "vehicles/edit_service.html",
+        vehicle=vehicle,
+        record=record,
+        service_types=COMMON_SERVICE_TYPES,
+        selected_type=selected_type,
+        custom_service_type=custom_service_type,
+        error=None,
+    )
+
+
+@bp.route("/<int:vehicle_id>/services/<int:service_id>/edit", methods=["POST"])
+def update_service_record(vehicle_id, service_id):
+    db = get_db()
+    vehicle = get_vehicle_or_404(vehicle_id, db)
+    record = get_service_record_or_404(vehicle_id, service_id, db)
+
+    service_type = request.form.get("service_type", "")
+    custom_service_type = request.form.get("custom_service_type", "")
+    service_date = request.form.get("service_date", "")
+    mileage_at_service = request.form.get("mileage_at_service", type=int)
+    cost = request.form.get("cost", type=float)
+    service_provider = request.form.get("service_provider", "")
+    notes = request.form.get("notes", "")
+
+    def redisplay(error):
+        selected_type, original_custom = reminder_type_fields(record)
+        return render_template(
+            "vehicles/edit_service.html",
+            vehicle=vehicle,
+            record=record,
+            service_types=COMMON_SERVICE_TYPES,
+            selected_type=selected_type,
+            custom_service_type=original_custom,
+            error=error,
+        ), 400
+
+    try:
+        date_obj = datetime.date.fromisoformat(service_date)
+    except ValueError:
+        return redisplay("Invalid date format.")
+
+    record.service_type = resolve_service_type(service_type, custom_service_type)
+    record.service_date = date_obj
+    record.mileage_at_service = mileage_at_service
+    record.cost = cost
+    record.service_provider = service_provider.strip() or None
+    record.notes = notes.strip() or None
+
+    if mileage_at_service and mileage_at_service > (vehicle.current_mileage or 0):
+        vehicle.current_mileage = mileage_at_service
+
+    db.commit()
+    return redirect(f"/vehicles/{vehicle_id}", code=303)
+
+
 @bp.route("/<int:vehicle_id>/services/<int:service_id>/delete", methods=["POST"])
 def delete_service_record(vehicle_id, service_id):
     db = get_db()
-    record = (
-        db.query(MaintenanceRecord)
-        .filter(MaintenanceRecord.id == service_id, MaintenanceRecord.vehicle_id == vehicle_id)
-        .first()
-    )
-    if not record:
-        abort(404, description="Service record not found")
+    record = get_service_record_or_404(vehicle_id, service_id, db)
     db.delete(record)
     db.commit()
     return redirect(f"/vehicles/{vehicle_id}", code=303)
@@ -304,9 +372,22 @@ def create_reminder(vehicle_id):
 
     service_type = request.form.get("service_type", "")
     custom_service_type = request.form.get("custom_service_type", "")
+    last_service_date = request.form.get("last_service_date", "")
     due_date = request.form.get("due_date", "")
     due_mileage = request.form.get("due_mileage", type=int)
     notes = request.form.get("notes", "")
+
+    last_service_date_obj = None
+    if last_service_date.strip():
+        try:
+            last_service_date_obj = datetime.date.fromisoformat(last_service_date)
+        except ValueError:
+            return render_template(
+                "vehicles/add_reminder.html",
+                vehicle=vehicle,
+                service_types=COMMON_SERVICE_TYPES,
+                error="Invalid date format.",
+            ), 400
 
     date_obj = None
     if due_date.strip():
@@ -331,6 +412,7 @@ def create_reminder(vehicle_id):
     reminder = MaintenanceReminder(
         vehicle_id=vehicle_id,
         service_type=resolve_service_type(service_type, custom_service_type),
+        last_service_date=last_service_date_obj,
         due_date=date_obj,
         due_mileage=due_mileage,
         notes=notes.strip() or None,
@@ -366,6 +448,7 @@ def update_reminder(vehicle_id, reminder_id):
 
     service_type = request.form.get("service_type", "")
     custom_service_type = request.form.get("custom_service_type", "")
+    last_service_date = request.form.get("last_service_date", "")
     due_date = request.form.get("due_date", "")
     due_mileage = request.form.get("due_mileage", type=int)
     notes = request.form.get("notes", "")
@@ -382,6 +465,13 @@ def update_reminder(vehicle_id, reminder_id):
             error=error,
         ), status_code
 
+    last_service_date_obj = None
+    if last_service_date.strip():
+        try:
+            last_service_date_obj = datetime.date.fromisoformat(last_service_date)
+        except ValueError:
+            return redisplay("Invalid date format.", 400)
+
     date_obj = None
     if due_date.strip():
         try:
@@ -393,6 +483,7 @@ def update_reminder(vehicle_id, reminder_id):
         return redisplay("Please provide at least a due date or due mileage.", 400)
 
     reminder.service_type = resolve_service_type(service_type, custom_service_type)
+    reminder.last_service_date = last_service_date_obj
     reminder.due_date = date_obj
     reminder.due_mileage = due_mileage
     reminder.notes = notes.strip() or None

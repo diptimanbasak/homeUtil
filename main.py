@@ -8,7 +8,7 @@ from flask import Flask
 
 import models  # noqa: F401  (import registers ORM models before create_all)
 from config import DEBUG, HOST, PORT
-from database import Base, close_db, engine
+from database import Base, check_schema_is_current, close_db, engine
 from models import CATEGORY_COLORS
 from rendering import format_currency, format_number
 from routes.chores import bp as chores_bp
@@ -18,6 +18,10 @@ from routes.vehicles import bp as vehicles_bp
 
 # Create tables on startup if they don't exist yet. Safe to call every time.
 Base.metadata.create_all(bind=engine)
+
+# Fail fast with a clear message if a model column is missing from an
+# existing table, rather than letting the first request that touches it 500.
+check_schema_is_current()
 
 app = Flask(__name__)
 

@@ -38,7 +38,7 @@ EOF
 sudo systemctl daemon-reload && sudo systemctl restart homeutil
 ```
 
-**Schema changes require manual migration.** `Base.metadata.create_all()` (called on every app startup in `main.py`) only creates missing tables — it never alters existing ones. Adding a column to an existing model means running `ALTER TABLE ... ADD COLUMN ...` by hand against `data/homeutil.db` on the server (there's no migration framework/Alembic in this project — keep it that way unless the data volume genuinely justifies it).
+**Schema changes require manual migration.** `Base.metadata.create_all()` (called on every app startup in `main.py`) only creates missing tables — it never alters existing ones. Adding a column to an existing model means running `ALTER TABLE ... ADD COLUMN ...` by hand against `data/homeutil.db` on the server (there's no migration framework/Alembic in this project — keep it that way unless the data volume genuinely justifies it). To catch a forgotten migration before it surfaces as a confusing 500 on some random route, `database.py: check_schema_is_current()` runs right after `create_all()` on every startup: it inspects each existing table's actual columns against what the model expects, and if any are missing it prints the exact `ALTER TABLE` statement(s) needed and exits with a non-zero code instead of starting the app.
 
 ## Architecture
 
@@ -58,6 +58,6 @@ Receipt files are never shown inline in the UI (they can be large/numerous, and 
 
 HEIC photos (default iPhone format) aren't accepted by Claude's vision API — `receipts.py: convert_heic_to_jpeg` converts them via `pillow-heif` before both the API call and disk storage, so stored receipts are always browser-viewable JPEGs regardless of source format. PDFs are stored and sent as-is (no conversion needed).
 
-**Vehicles** (`models.py: Vehicle`/`MaintenanceRecord`/`MaintenanceReminder`): reminders are classified as `overdue` / `due_soon` / `ok` based on `REMINDER_DUE_SOON_DAYS` and `REMINDER_DUE_SOON_MILES` thresholds in `config.py`, computed in `routes/dashboard.py: _reminder_status` and reused by `routes/vehicles.py`.
+**Vehicles** (`models.py: Vehicle`/`MaintenanceRecord`/`MaintenanceReminder`): reminders are classified as `overdue` / `due_soon` / `ok` based on `REMINDER_DUE_SOON_DAYS` and `REMINDER_DUE_SOON_MILES` thresholds in `config.py`, computed in `routes/dashboard.py: _reminder_status` and reused by `routes/vehicles.py`. `MaintenanceReminder.last_service_date` is informational only (not used in the overdue/due-soon calculation, which is purely forward-looking off `due_date`/`due_mileage`) — it's just displayed so the user can see when the service was last done.
 
 **Chores** (`models.py: Chore`/`ChoreLog`): recurrence is frequency-based (`CHORE_FREQUENCIES` maps a frequency string to an interval in days), with `next_due()`/`status()` computed as model methods on `Chore` rather than stored.
