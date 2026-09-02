@@ -23,6 +23,12 @@
             <input type="text" id="vendor" name="vendor" class="form-control" value="{{ expense.vendor or '' }}">
         </div>
 
+        <div class="form-group">
+            <label class="form-label" for="vendor_domain">Logo Domain</label>
+            <input type="text" id="vendor_domain" name="vendor_domain" class="form-control" value="{{ expense.vendor_domain or '' }}" placeholder="e.g. costco.com">
+            <p class="form-hint">Used to fetch the vendor's logo. Auto-guessed from the vendor name -- correct it here if the logo shown is wrong.</p>
+        </div>
+
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label" for="amount">Amount</label>

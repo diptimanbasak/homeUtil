@@ -6,9 +6,10 @@ maintenance), chores (daily home chores tracking), expenses (receipt
 tracking).
 """
 import datetime
+import re
 
 from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 
 from database import Base
 
@@ -146,7 +147,7 @@ class ChoreLog(Base):
 EXPENSE_CATEGORIES = [
     "Groceries", "Dining", "Utilities", "Home", "Auto",
     "Medical", "Shopping", "Entertainment", "Electronics",
-    "Home Repair", "Cleaning Supplies", "Decor", "Other",
+    "Home Repair", "Cleaning Supplies", "Decor", "Wine and Liquor", "Beauty Products", "Other",
 ]
 
 # Vendor name (lowercase substring match) -> category. Applied on receipt
@@ -165,6 +166,68 @@ def categorize_by_vendor(vendor: str | None) -> str | None:
         if needle in vendor_lower:
             return category
     return None
+
+
+# Seeded into VendorDomainOverride on first startup (see main.py) if that
+# table is empty, so vendors already known to need a correction -- the
+# word-based guess below either folds in extra receipt words (e.g. "Costco
+# Wholesale" -> "costcowholesale.com", which doesn't exist) or lands on a
+# domain the chain simply doesn't use (e.g. Aldi's US site is aldi.us, not
+# aldi.com) -- work out of the box without the user re-entering them on the
+# Vendor Domains settings page.
+DEFAULT_VENDOR_DOMAIN_OVERRIDES = [
+    ("costco", "costco.com"),
+    ("patel brothers", "patelbros.com"),
+    ("aldi", "aldi.us"),
+    ("cactus", "cactu.lu"),
+    ("mccaffreys", "mccaffreys.com"),
+]
+
+# Words stripped out when guessing a vendor's domain from its scanned name --
+# either corporate suffixes or generic receipt boilerplate (store/warehouse
+# labels), neither of which are part of the actual brand domain.
+_VENDOR_DOMAIN_STOPWORDS = {"the", "inc", "llc", "corp", "co", "store", "whse", "warehouse"}
+
+
+def guess_vendor_domain(vendor: str | None, db=None) -> str | None:
+    """Best-effort guess at a vendor's website domain from its scanned name,
+    used as a starting point for Expense.vendor_domain (which the user can
+    then correct on the edit-expense page if the guess is wrong -- there's
+    no reliable way to resolve an arbitrary receipt vendor string to its
+    real domain, so this is only ever a first guess, not a lookup).
+
+    Checks user-managed VendorDomainOverride rows first (see the Vendor
+    Domains settings page) when a db session is given, then falls back to
+    a generic word-based guess."""
+    if not vendor:
+        return None
+    vendor_lower = vendor.lower()
+
+    if db is not None:
+        for override in db.query(VendorDomainOverride).all():
+            if override.match_text.lower() in vendor_lower:
+                return override.domain
+
+    cleaned = re.sub(r"\(.*?\)", "", vendor_lower)      # drop parenthetical store #s/addresses
+    cleaned = re.sub(r"[^a-z\s]", "", cleaned)          # drop digits/punctuation
+    words = [w for w in cleaned.split() if w not in _VENDOR_DOMAIN_STOPWORDS]
+    if not words:
+        return None
+    return "".join(words[:2]) + ".com"
+
+
+class VendorDomainOverride(Base):
+    """A user-managed correction from a vendor-name substring to the domain
+    to use for its logo, for vendors where guess_vendor_domain's generic
+    word-based guess is wrong (see the Vendor Domains settings page under
+    Expenses)."""
+
+    __tablename__ = "vendor_domain_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_text = Column(String(150), nullable=False)
+    domain = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 # Fixed category -> color mapping (dataviz skill's 8-hue categorical
@@ -189,6 +252,7 @@ class Expense(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     vendor = Column(String(150))
+    vendor_domain = Column(String(255))
     amount = Column(Float)
     expense_date = Column(Date)
     category = Column(String(50), default="Other")
@@ -206,6 +270,19 @@ class Expense(Base):
         if self.amount is None:
             return None
         return self.amount - sum(ri.amount for ri in self.returned_items)
+
+    @property
+    def logo_url(self):
+        """Favicon-as-logo for the vendor, fetched client-side from Google's
+        public favicon service (no API key, no server-side dependency).
+        Uses vendor_domain if the user has set/corrected it, otherwise falls
+        back to a best-effort guess from the vendor name (checking
+        user-managed VendorDomainOverride rows via the session this Expense
+        is already attached to)."""
+        domain = self.vendor_domain or guess_vendor_domain(self.vendor, db=object_session(self))
+        if not domain:
+            return None
+        return f"https://www.google.com/s2/favicons?domain={domain}&sz=32"
 
     @property
     def category_label(self):
@@ -250,3 +327,45 @@ class ReturnedItem(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     expense = relationship("Expense", back_populates="returned_items")
+
+
+class KidsClass(Base):
+    """A recurring kids' class/activity, e.g. swimming lessons or piano."""
+
+    __tablename__ = "kids_classes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    class_name = Column(String(150), nullable=False)
+    class_date = Column(Date)
+    recurrence = Column(String(100))
+    class_time = Column(String(50))
+    cost_details = Column(String(255))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# The two kinds of filter FilterRecord tracks -- one table with a
+# filter_type column (like Expense.category) rather than separate tables.
+# HVAC uses brand/size; Air Purifier uses filter_kind/in_stock instead (see
+# FILTER_KINDS below) -- the fields that don't apply to a given filter_type
+# are simply left NULL.
+FILTER_TYPES = ["HVAC", "Air Purifier"]
+
+# Air Purifier filter_kind options -- HVAC doesn't use this field.
+FILTER_KINDS = ["HEPA", "Carbon"]
+
+
+class FilterRecord(Base):
+    """A home filter (HVAC or air purifier) that needs periodic replacement."""
+
+    __tablename__ = "filter_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filter_type = Column(String(50), nullable=False)
+    brand = Column(String(150))
+    changed_on = Column(Date)
+    due_date = Column(Date)
+    size = Column(String(50))
+    filter_kind = Column(String(50))
+    in_stock = Column(Boolean, default=False)
+    model = Column(String(150))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

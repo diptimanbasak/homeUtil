@@ -9,6 +9,8 @@
     </div>
     <div style="display:flex;gap:0.5rem;">
         <a href="/expenses/report{{ '?' + filters|urlencode if filters }}" class="btn btn-outline">Report</a>
+        <a href="/expenses/vendor-domains" class="btn btn-outline">Vendor Domains</a>
+        <a href="/expenses/new/manual" class="btn btn-outline">+ Add Manually</a>
         <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
     </div>
 </div>
@@ -35,6 +37,10 @@
         <label class="form-label" for="vendor">Vendor</label>
         <input type="text" id="vendor" name="vendor" class="form-control" placeholder="e.g. Target" value="{{ filters.get('vendor', '') }}">
     </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="item">Item</label>
+        <input type="text" id="item" name="item" class="form-control" placeholder="e.g. Milk" value="{{ filters.get('item', '') }}">
+    </div>
     <button type="submit" class="btn btn-primary">Filter</button>
     {% if filters %}
     <a href="/expenses" class="btn btn-outline">Clear</a>
@@ -59,6 +65,9 @@
                 <tr class="expense-row" style="--i:{{ loop.index0 }};cursor:pointer;" onclick="window.location='/expenses/{{ e.id }}'">
                     <td>{{ e.expense_date.strftime('%b %d, %Y') if e.expense_date else '—' }}</td>
                     <td>
+                        {% if e.logo_url %}
+                        <img src="{{ e.logo_url }}" alt="" width="16" height="16" style="vertical-align:middle;margin-right:0.4rem;border-radius:3px;" onerror="this.style.display='none';">
+                        {% endif %}
                         {{ e.vendor or '—' }}
                         {% if e.returned_items %}
                         <span class="return-tag" title="Has a return">R</span>

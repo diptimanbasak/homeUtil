@@ -11,7 +11,16 @@ from werkzeug.utils import secure_filename
 
 from config import RECEIPTS_DIR
 from database import get_db
-from models import CATEGORY_COLORS, EXPENSE_CATEGORIES, Expense, ExpenseItem, ReturnedItem, categorize_by_vendor
+from models import (
+    CATEGORY_COLORS,
+    EXPENSE_CATEGORIES,
+    Expense,
+    ExpenseItem,
+    ReturnedItem,
+    VendorDomainOverride,
+    categorize_by_vendor,
+    guess_vendor_domain,
+)
 from receipts import convert_heic_to_jpeg, extract_receipt_data
 
 bp = Blueprint("expenses", __name__, url_prefix="/expenses")
@@ -34,6 +43,7 @@ def _apply_filters(query, args):
     date_to = args.get("date_to", "")
     category = args.get("category", "")
     vendor = args.get("vendor", "").strip()
+    item = args.get("item", "").strip()
 
     if date_from:
         try:
@@ -46,9 +56,18 @@ def _apply_filters(query, args):
         except ValueError:
             pass
     if category in EXPENSE_CATEGORIES:
-        query = query.filter(Expense.category == category)
+        # Mirrors Expense.category_label: an itemized expense is filtered by
+        # its items' categories (since that's what the badge displays), not
+        # by the single top-level category picked at scan time. Only an
+        # expense with no items at all (e.g. manual entry) falls back to it.
+        query = query.filter(
+            Expense.items.any(ExpenseItem.category == category)
+            | (~Expense.items.any() & (Expense.category == category))
+        )
     if vendor:
         query = query.filter(Expense.vendor.ilike(f"%{vendor}%"))
+    if item:
+        query = query.filter(Expense.items.any(ExpenseItem.name.ilike(f"%{item}%")))
 
     return query
 
@@ -139,6 +158,7 @@ def create_expense():
 
     expense = Expense(
         vendor=extracted["vendor"],
+        vendor_domain=guess_vendor_domain(extracted["vendor"], db=db),
         amount=extracted["amount"],
         expense_date=date_obj,
         category=category,
@@ -159,6 +179,47 @@ def create_expense():
             ))
     db.commit()
 
+    return redirect(f"/expenses/{expense.id}", code=303)
+
+
+# --------------------------------------------------------- manual entry
+
+@bp.route("/new/manual", methods=["GET"])
+def add_expense_manual_form():
+    return render_template("expenses/add_expense_manual.html", categories=EXPENSE_CATEGORIES, error=None)
+
+
+@bp.route("/new/manual", methods=["POST"])
+def create_expense_manual():
+    db = get_db()
+    vendor = request.form.get("vendor", "")
+    amount = request.form.get("amount", type=float)
+    expense_date = request.form.get("expense_date", "")
+    category = request.form.get("category", "Other")
+    notes = request.form.get("notes", "")
+
+    date_obj = None
+    if expense_date.strip():
+        try:
+            date_obj = datetime.date.fromisoformat(expense_date)
+        except ValueError:
+            return render_template(
+                "expenses/add_expense_manual.html",
+                categories=EXPENSE_CATEGORIES,
+                error="Invalid date format.",
+            ), 400
+
+    expense = Expense(
+        vendor=vendor.strip() or None,
+        vendor_domain=guess_vendor_domain(vendor.strip() or None, db=db),
+        amount=amount,
+        expense_date=date_obj,
+        category=category if category in EXPENSE_CATEGORIES else "Other",
+        notes=notes.strip() or None,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
     return redirect(f"/expenses/{expense.id}", code=303)
 
 
@@ -198,6 +259,7 @@ def update_expense(expense_id):
     expense = get_expense_or_404(expense_id, db)
 
     vendor = request.form.get("vendor", "")
+    vendor_domain = request.form.get("vendor_domain", "")
     amount = request.form.get("amount", type=float)
     expense_date = request.form.get("expense_date", "")
     category = request.form.get("category", "Other")
@@ -216,6 +278,7 @@ def update_expense(expense_id):
             ), 400
 
     expense.vendor = vendor.strip() or None
+    expense.vendor_domain = vendor_domain.strip() or None
     expense.amount = amount
     expense.expense_date = date_obj
     expense.category = category if category in EXPENSE_CATEGORIES else "Other"
@@ -301,18 +364,14 @@ def delete_returned_item(expense_id, return_id):
 
 # --------------------------------------------------------------------- report
 
-@bp.route("/report")
-def category_report():
-    db = get_db()
-    expenses = _apply_filters(db.query(Expense), request.args).all()
-
-    # Grouped by each item's own category, like the detail page shows, so a
-    # receipt spanning multiple categories (see Expense.category_label)
-    # contributes to each of them rather than being lumped under one. A
-    # return is matched back to the item it came from by name so its
-    # deduction lands in the right category; if there's no matching item
-    # (or the expense was never itemized) it falls back to the expense's
-    # single top-level category.
+def _category_totals(expenses):
+    """Grouped by each item's own category, like the detail page shows, so a
+    receipt spanning multiple categories (see Expense.category_label)
+    contributes to each of them rather than being lumped under one. A
+    return is matched back to the item it came from by name so its
+    deduction lands in the right category; if there's no matching item
+    (or the expense was never itemized) it falls back to the expense's
+    single top-level category."""
     totals = defaultdict(float)
     for expense in expenses:
         if not expense.items:
@@ -327,6 +386,32 @@ def category_report():
             category = item_category_by_name.get(returned.name, expense.category or "Other")
             totals[category] -= returned.amount
 
+    return totals
+
+
+def _month_key(expense: Expense):
+    """Sortable (year, month) key, grouping undated expenses last."""
+    if not expense.expense_date:
+        return (9999, 99)
+    return (expense.expense_date.year, expense.expense_date.month)
+
+
+def _monthly_totals(expenses):
+    """Net amount per calendar month (label via _month_group), in
+    chronological order -- shared by the line, date-wise, and matrix views."""
+    totals = defaultdict(float)
+    for expense in expenses:
+        if expense.net_amount:
+            totals[_month_group(expense)] += expense.net_amount
+
+    ordered_labels = sorted(
+        totals.keys(),
+        key=lambda label: min(_month_key(e) for e in expenses if _month_group(e) == label),
+    )
+    return [(label, totals[label]) for label in ordered_labels]
+
+
+def _pie_chart_data(totals):
     breakdown = sorted(totals.items(), key=lambda pair: pair[1], reverse=True)
     grand_total = sum(totals.values())
 
@@ -356,13 +441,166 @@ def category_report():
         })
         cumulative += dash
 
+    return breakdown, grand_total, slices, radius, circumference
+
+
+def _line_chart_points(monthly_totals, width=600, height=220, pad=30):
+    """SVG polyline points for a simple month-over-month spend line, scaled
+    to fit width x height with `pad` margin on every side -- no charting
+    library, consistent with the pie chart's hand-rolled SVG."""
+    if not monthly_totals:
+        return [], []
+
+    amounts = [amount for _, amount in monthly_totals]
+    max_amount = max(amounts) or 1
+    n = len(monthly_totals)
+    plot_w = width - 2 * pad
+    plot_h = height - 2 * pad
+
+    points = []
+    for i, (label, amount) in enumerate(monthly_totals):
+        x = pad + (i * plot_w / (n - 1) if n > 1 else plot_w / 2)
+        y = pad + plot_h - (amount / max_amount * plot_h)
+        points.append({"x": round(x, 1), "y": round(y, 1), "label": label, "amount": amount})
+
+    return points, [f"{p['x']},{p['y']}" for p in points]
+
+
+VALID_REPORT_VIEWS = ["pie", "line", "date", "category", "matrix"]
+
+
+@bp.route("/report")
+def category_report():
+    db = get_db()
+    expenses = _apply_filters(db.query(Expense), request.args).all()
+
+    view = request.args.get("view", "pie")
+    if view not in VALID_REPORT_VIEWS:
+        view = "pie"
+
+    totals = _category_totals(expenses)
+    breakdown, grand_total, slices, radius, circumference = _pie_chart_data(totals)
+
+    monthly_totals = _monthly_totals(expenses)
+    line_points, line_polyline = _line_chart_points(monthly_totals)
+
+    # Date-wise: same month buckets as the expenses list, but sorted
+    # chronologically here (the list page shows newest-first) since a
+    # report reads more naturally as a timeline.
+    date_wise = [
+        (label, list(group))
+        for label, group in itertools.groupby(
+            sorted(expenses, key=_month_key), key=_month_group
+        )
+    ]
+
+    # Monthly x category matrix: rows are months (chronological), columns
+    # are every category that has at least one nonzero total anywhere, so
+    # the table doesn't show columns of all-zero categories.
+    matrix_rows = []
+    matrix_categories = set()
+    for label, month_expenses in date_wise:
+        month_totals = _category_totals(month_expenses)
+        matrix_categories.update(cat for cat, amount in month_totals.items() if amount)
+        matrix_rows.append((label, month_totals, sum(month_totals.values())))
+    matrix_categories = [c for c in EXPENSE_CATEGORIES if c in matrix_categories]
+    matrix_column_totals = {
+        cat: sum(month_totals.get(cat, 0) for _, month_totals, _ in matrix_rows)
+        for cat in matrix_categories
+    }
+
     return render_template(
         "expenses/report.html",
+        view=view,
         breakdown=breakdown,
         grand_total=grand_total,
         slices=slices,
         radius=radius,
         circumference=circumference,
+        monthly_totals=monthly_totals,
+        line_points=line_points,
+        line_polyline=" ".join(line_polyline),
+        date_wise=date_wise,
+        matrix_rows=matrix_rows,
+        matrix_categories=matrix_categories,
+        matrix_column_totals=matrix_column_totals,
         categories=EXPENSE_CATEGORIES,
         filters=request.args,
     )
+
+
+# ------------------------------------------------------- vendor domains
+
+def _clear_stale_vendor_domain(db, match_text: str):
+    """An Expense's own vendor_domain (once set) always wins over the
+    overrides table in Expense.logo_url, so adding/editing an override alone
+    wouldn't change anything for expenses that already stored a (possibly
+    wrong) guess before this override existed. Clearing it here makes the
+    override actually take effect immediately for those expenses, instead
+    of requiring a manual per-expense fix on the edit page."""
+    db.query(Expense).filter(Expense.vendor.ilike(f"%{match_text}%")).update(
+        {"vendor_domain": None}, synchronize_session=False
+    )
+
+
+@bp.route("/vendor-domains")
+def list_vendor_domains():
+    db = get_db()
+    overrides = db.query(VendorDomainOverride).order_by(VendorDomainOverride.match_text).all()
+    return render_template("expenses/vendor_domains.html", overrides=overrides, error=None)
+
+
+@bp.route("/vendor-domains/new", methods=["POST"])
+def create_vendor_domain():
+    db = get_db()
+    match_text = request.form.get("match_text", "").strip()
+    domain = request.form.get("domain", "").strip()
+
+    if not match_text or not domain:
+        overrides = db.query(VendorDomainOverride).order_by(VendorDomainOverride.match_text).all()
+        return render_template(
+            "expenses/vendor_domains.html",
+            overrides=overrides,
+            error="Both Vendor Match and Domain are required.",
+        ), 400
+
+    db.add(VendorDomainOverride(match_text=match_text.lower(), domain=domain))
+    _clear_stale_vendor_domain(db, match_text)
+    db.commit()
+    return redirect("/expenses/vendor-domains", code=303)
+
+
+@bp.route("/vendor-domains/<int:override_id>/edit", methods=["POST"])
+def update_vendor_domain(override_id):
+    db = get_db()
+    override = db.query(VendorDomainOverride).filter(VendorDomainOverride.id == override_id).first()
+    if not override:
+        abort(404, description="Override not found")
+
+    match_text = request.form.get("match_text", "").strip()
+    domain = request.form.get("domain", "").strip()
+
+    if not match_text or not domain:
+        overrides = db.query(VendorDomainOverride).order_by(VendorDomainOverride.match_text).all()
+        return render_template(
+            "expenses/vendor_domains.html",
+            overrides=overrides,
+            error="Both Vendor Match and Domain are required.",
+        ), 400
+
+    override.match_text = match_text.lower()
+    override.domain = domain
+    _clear_stale_vendor_domain(db, match_text)
+    db.commit()
+    return redirect("/expenses/vendor-domains", code=303)
+
+
+@bp.route("/vendor-domains/<int:override_id>/delete", methods=["POST"])
+def delete_vendor_domain(override_id):
+    db = get_db()
+    override = db.query(VendorDomainOverride).filter(VendorDomainOverride.id == override_id).first()
+    if not override:
+        abort(404, description="Override not found")
+    db.delete(override)
+    db.commit()
+    return redirect("/expenses/vendor-domains", code=303)

@@ -19,11 +19,12 @@
                     <a href="/vehicles" class="sidebar-link {% if request.path.startswith('/vehicles') %}active{% endif %}">Vehicle Maintenance</a>
                     <a href="/chores" class="sidebar-link {% if request.path.startswith('/chores') %}active{% endif %}">Chores</a>
                     <a href="/expenses" class="sidebar-link {% if request.path.startswith('/expenses') %}active{% endif %}">Expenses</a>
+                    <a href="/kids-classes" class="sidebar-link {% if request.path.startswith('/kids-classes') %}active{% endif %}">Kids Classes</a>
+                    <a href="/filter-maintenance" class="sidebar-link {% if request.path.startswith('/filter-maintenance') %}active{% endif %}">Filter Maintenance</a>
                 </div>
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Coming Soon</div>
                     <span class="sidebar-link disabled">Home Network</span>
-                    <span class="sidebar-link disabled">Kids Classes</span>
                     <span class="sidebar-link disabled">Events</span>
                     <span class="sidebar-link disabled">Birthdays</span>
                     <span class="sidebar-link disabled">Doctor Appointments</span>
@@ -53,6 +54,27 @@
                     customRow.classList.toggle("visible", typeSelect.value === "Other");
                 };
                 typeSelect.addEventListener("change", sync);
+                sync();
+            }
+        });
+
+        // Filter Maintenance: show Brand/Size for HVAC, Filter Kind/In Stock
+        // for Air Purifier, based on the filter_type dropdown.
+        document.addEventListener("DOMContentLoaded", function () {
+            var filterTypeSelect = document.getElementById("filter_type");
+            var hvacFields = document.getElementById("hvac-fields");
+            var airPurifierFields = document.getElementById("air-purifier-fields");
+            var airPurifierStock = document.getElementById("air-purifier-stock");
+            if (filterTypeSelect && hvacFields && airPurifierFields) {
+                var sync = function () {
+                    var isAirPurifier = filterTypeSelect.value === "Air Purifier";
+                    hvacFields.classList.toggle("visible", !isAirPurifier);
+                    airPurifierFields.classList.toggle("visible", isAirPurifier);
+                    if (airPurifierStock) {
+                        airPurifierStock.classList.toggle("visible", isAirPurifier);
+                    }
+                };
+                filterTypeSelect.addEventListener("change", sync);
                 sync();
             }
         });

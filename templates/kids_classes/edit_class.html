@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ kids_class.class_name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/kids-classes">Kids Classes</a>
+    <span>›</span> Edit
+</div>
+
+<div class="page-header">
+    <h1>Edit Class</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+    <form method="post" action="/kids-classes/{{ kids_class.id }}/edit">
+        <div class="form-group">
+            <label class="form-label" for="class_name">Class Name <span class="required">*</span></label>
+            <input type="text" id="class_name" name="class_name" class="form-control" value="{{ kids_class.class_name }}" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="class_date">Date</label>
+                <input type="date" id="class_date" name="class_date" class="form-control" value="{{ kids_class.class_date.isoformat() if kids_class.class_date else '' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="class_time">Time</label>
+                <input type="text" id="class_time" name="class_time" class="form-control" value="{{ kids_class.class_time or '' }}" placeholder="e.g. 4:00 PM">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="recurrence">Recurrence</label>
+            <input type="text" id="recurrence" name="recurrence" class="form-control" value="{{ kids_class.recurrence or '' }}" placeholder="e.g. Every Tuesday">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="cost_details">Cost Details</label>
+            <input type="text" id="cost_details" name="cost_details" class="form-control" value="{{ kids_class.cost_details or '' }}" placeholder="e.g. $80/month">
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/kids-classes" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

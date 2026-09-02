@@ -240,3 +240,38 @@ tr:hover td { background: #fafbfc; }
 .legend-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
 
 .total-figure { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+
+.report-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1rem; flex-wrap: wrap; }
+.report-tab {
+    padding: 0.6rem 1rem; font-size: 0.875rem; font-weight: 500;
+    color: var(--color-text-muted); text-decoration: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.report-tab:hover { color: var(--color-text); }
+.report-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+
+.matrix-table th, .matrix-table td { text-align: right; white-space: nowrap; }
+.matrix-table th:first-child, .matrix-table td:first-child { text-align: left; }
+.matrix-table tfoot td, .matrix-table .matrix-row-total { font-weight: 700; }
+
+/* Filter Maintenance: HVAC vs. Air Purifier conditional form fields */
+.type-fields { display: none; }
+.type-fields.visible { display: block; }
+
+.kind-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; }
+.kind-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.kind-dot.hepa { background: #2f7a6f; }
+.kind-dot.carbon { background: #6b5b3d; }
+
+.stock-pill {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;
+}
+.stock-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.stock-yes { background: var(--color-success-bg); color: var(--color-success); }
+.stock-no { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.checkbox-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0; }
+.checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--color-primary); cursor: pointer; }
+.checkbox-row label { font-size: 0.9rem; font-weight: 500; cursor: pointer; }

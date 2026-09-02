@@ -9,7 +9,12 @@
 
 <div class="page-header">
     <div>
-        <h1>{{ expense.vendor or "Unknown Vendor" }}</h1>
+        <h1>
+            {% if expense.logo_url %}
+            <img src="{{ expense.logo_url }}" alt="" width="24" height="24" style="vertical-align:middle;margin-right:0.5rem;border-radius:4px;" onerror="this.style.display='none';">
+            {% endif %}
+            {{ expense.vendor or "Unknown Vendor" }}
+        </h1>
         <p>{{ expense.expense_date.strftime('%B %d, %Y') if expense.expense_date else "No date" }}</p>
     </div>
     <div style="display:flex;gap:0.5rem;">

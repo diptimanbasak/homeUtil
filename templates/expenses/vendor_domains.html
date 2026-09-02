@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Vendor Domains{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/expenses">Expenses</a>
+    <span>›</span> Vendor Domains
+</div>
+
+<div class="page-header">
+    <div>
+        <h1>Vendor Domains</h1>
+        <p>Correct the domain used to fetch a vendor's logo, for vendors the automatic guess gets wrong.</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if overrides %}
+<div class="card" style="padding:0;">
+    <table>
+        <thead>
+            <tr>
+                <th>Vendor Match</th>
+                <th>Domain</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for o in overrides %}
+            <tr>
+                <td colspan="2" style="padding:0;">
+                    <form method="post" action="/expenses/vendor-domains/{{ o.id }}/edit" style="display:flex;gap:0.5rem;padding:0.5rem 0.75rem;">
+                        <input type="text" name="match_text" class="form-control" value="{{ o.match_text }}">
+                        <input type="text" name="domain" class="form-control" value="{{ o.domain }}">
+                        <button type="submit" class="btn btn-outline btn-sm">Save</button>
+                    </form>
+                </td>
+                <td style="white-space:nowrap;">
+                    <form method="post" action="/expenses/vendor-domains/{{ o.id }}/delete"
+                          onsubmit="return confirm('Delete this override?');">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No vendor domain overrides yet</h3>
+    <p>Add one below for a vendor whose logo isn't showing correctly.</p>
+</div>
+{% endif %}
+
+<div class="card mt-2" style="max-width:600px;">
+    <div class="card-title">Add Override</div>
+    <form method="post" action="/expenses/vendor-domains/new" style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="match_text">Vendor Match</label>
+            <input type="text" id="match_text" name="match_text" class="form-control" placeholder="e.g. aldi" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="domain">Domain</label>
+            <input type="text" id="domain" name="domain" class="form-control" placeholder="e.g. aldi.us" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+    <p class="form-hint" style="margin-top:0.75rem;">"Vendor Match" is matched as a lowercase substring against the scanned vendor name (e.g. "aldi" matches "ALDI 1234").</p>
+</div>
+{% endblock %}

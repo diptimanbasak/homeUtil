@@ -9,12 +9,13 @@
 
 <div class="page-header">
     <div>
-        <h1>Spending by Category</h1>
+        <h1>Expense Report</h1>
         <p class="total-figure">{{ grand_total | currency }}</p>
     </div>
 </div>
 
 <form method="get" action="/expenses/report" class="card mb-2" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+    <input type="hidden" name="view" value="{{ view }}">
     <div class="form-group" style="margin-bottom:0;">
         <label class="form-label" for="date_from">From</label>
         <input type="date" id="date_from" name="date_from" class="form-control" value="{{ filters.get('date_from', '') }}">
@@ -37,12 +38,37 @@
         <input type="text" id="vendor" name="vendor" class="form-control" placeholder="e.g. Target" value="{{ filters.get('vendor', '') }}">
     </div>
     <button type="submit" class="btn btn-primary">Generate Report</button>
-    {% if filters %}
-    <a href="/expenses/report" class="btn btn-outline">Clear</a>
+    {% if filters.get('date_from') or filters.get('date_to') or filters.get('category') or filters.get('vendor') %}
+    <a href="/expenses/report?view={{ view }}" class="btn btn-outline">Clear</a>
     {% endif %}
 </form>
 
-{% if breakdown %}
+{% macro tab_url(v) -%}
+/expenses/report?{{ filters|urlencode }}{{ '&' if filters }}view={{ v }}
+{%- endmacro %}
+
+<div class="report-tabs">
+    <a class="report-tab {{ 'active' if view == 'pie' }}" href="{{ tab_url('pie') }}">Pie Graph</a>
+    <a class="report-tab {{ 'active' if view == 'line' }}" href="{{ tab_url('line') }}">Line Graph</a>
+    <a class="report-tab {{ 'active' if view == 'date' }}" href="{{ tab_url('date') }}">Date-wise</a>
+    <a class="report-tab {{ 'active' if view == 'category' }}" href="{{ tab_url('category') }}">Category-wise</a>
+    <a class="report-tab {{ 'active' if view == 'matrix' }}" href="{{ tab_url('matrix') }}">Monthly &times; Category</a>
+</div>
+
+{% if not breakdown %}
+<div class="empty-state">
+    <h3>No expenses{{ " match these filters" if filters else " yet" }}</h3>
+    {% if filters %}
+    <p>Try widening the date range or clearing a filter.</p>
+    <a href="/expenses/report?view={{ view }}" class="btn btn-outline">Clear filters</a>
+    {% else %}
+    <p>Once you've tracked some expenses, their breakdown shows up here.</p>
+    <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
+    {% endif %}
+</div>
+{% else %}
+
+{% if view == 'pie' %}
 <div class="card expense-card-hover mb-2" style="display:flex;gap:2.5rem;flex-wrap:wrap;align-items:center;">
     <svg width="200" height="200" viewBox="0 0 200 200">
         <circle cx="100" cy="100" r="{{ radius }}" fill="none" stroke="var(--color-border)" stroke-width="30" />
@@ -74,6 +100,70 @@
     });
 </script>
 
+{% elif view == 'line' %}
+<div class="card expense-card-hover mb-2">
+    {% if line_points|length > 1 %}
+    <svg width="600" height="220" viewBox="0 0 600 220" style="max-width:100%;height:auto;">
+        <polyline points="{{ line_polyline }}" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+        {% for p in line_points %}
+        <circle cx="{{ p.x }}" cy="{{ p.y }}" r="4" fill="var(--color-primary)">
+            <title>{{ p.label }}: {{ p.amount | currency }}</title>
+        </circle>
+        {% endfor %}
+    </svg>
+    <div style="display:flex;justify-content:space-between;color:var(--color-text-muted);font-size:0.75rem;margin-top:0.25rem;">
+        {% for p in line_points %}
+        <span>{{ p.label }}</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--color-text-muted);">Need at least two months of data to draw a trend line.</p>
+    {% endif %}
+</div>
+
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Month</th><th>Total</th></tr></thead>
+            <tbody>
+                {% for label, amount in monthly_totals %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>{{ label }}</td>
+                    <td><strong>{{ amount | currency }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif view == 'date' %}
+{% for month_label, month_expenses in date_wise %}
+<div class="card-title" style="margin-top:1.5rem;">{{ month_label }}
+    <span style="font-weight:normal;color:var(--color-text-muted);">
+        ({{ (month_expenses | selectattr('net_amount') | map(attribute='net_amount') | sum) | currency }})
+    </span>
+</div>
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Amount</th></tr></thead>
+            <tbody>
+                {% for e in month_expenses | sort(attribute='expense_date') %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};cursor:pointer;" onclick="window.location='/expenses/{{ e.id }}'">
+                    <td>{{ e.expense_date.strftime('%b %d, %Y') if e.expense_date else '—' }}</td>
+                    <td>{{ e.vendor or '—' }}</td>
+                    <td><span class="category-badge" style="background:{{ category_colors.get(e.category_label, '#94a3b8') }}22;color:{{ category_colors.get(e.category_label, '#94a3b8') }};">{{ e.category_label }}</span></td>
+                    <td><strong>{{ e.net_amount | currency if e.net_amount is not none else '—' }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+{% elif view == 'category' %}
 <div class="card expense-card-hover" style="padding:0;">
     <div class="table-wrap">
         <table>
@@ -94,16 +184,44 @@
         </table>
     </div>
 </div>
-{% else %}
-<div class="empty-state">
-    <h3>No expenses{{ " match these filters" if filters else " yet" }}</h3>
-    {% if filters %}
-    <p>Try widening the date range or clearing a filter.</p>
-    <a href="/expenses/report" class="btn btn-outline">Clear filters</a>
-    {% else %}
-    <p>Once you've tracked some expenses, their category breakdown shows up here.</p>
-    <a href="/expenses/new" class="btn btn-primary">Scan Receipt</a>
-    {% endif %}
+
+{% elif view == 'matrix' %}
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table class="matrix-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    {% for cat in matrix_categories %}
+                    <th>{{ cat }}</th>
+                    {% endfor %}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for label, month_totals, month_total in matrix_rows %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>{{ label }}</td>
+                    {% for cat in matrix_categories %}
+                    <td>{{ (month_totals.get(cat) | currency) if month_totals.get(cat) else '—' }}</td>
+                    {% endfor %}
+                    <td class="matrix-row-total">{{ month_total | currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td>
+                    {% for cat in matrix_categories %}
+                    <td>{{ matrix_column_totals.get(cat) | currency }}</td>
+                    {% endfor %}
+                    <td>{{ grand_total | currency }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
 </div>
+{% endif %}
+
 {% endif %}
 {% endblock %}

@@ -17,6 +17,19 @@ from PIL import Image
 
 from config import ANTHROPIC_API_KEY
 from models import EXPENSE_CATEGORIES
+from scripts.tesseract_receipt_ocr import parse_items_from_text
+
+# scripts/tesseract_receipt_ocr.py's categories are a generic standalone set
+# (not tied to this app's category list) -- map its labels onto the nearest
+# EXPENSE_CATEGORIES value so line items land in a category the rest of the
+# app recognizes.
+_OCR_ITEM_CATEGORY_MAP = {
+    "Grocery": "Groceries",
+    "Medical": "Medical",
+    "Auto": "Auto",
+    "Dining": "Dining",
+    "Shopping": "Shopping",
+}
 
 _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
@@ -104,7 +117,16 @@ def extract_receipt_data_ocr(image_bytes: bytes, media_type: str) -> dict:
 
     vendor = next((line.strip() for line in text.splitlines() if line.strip()), None)
 
-    return {**EMPTY_RECEIPT, "vendor": vendor, "amount": amount, "expense_date": expense_date}
+    line_items = [
+        {
+            "name": item["Item"],
+            "price": float(item["Price"].lstrip("$")),
+            "category": _OCR_ITEM_CATEGORY_MAP.get(item["Category"], "Other"),
+        }
+        for item in parse_items_from_text(text)
+    ]
+
+    return {**EMPTY_RECEIPT, "vendor": vendor, "amount": amount, "expense_date": expense_date, "line_items": line_items}
 
 
 def extract_receipt_data(image_bytes: bytes, media_type: str, method: str = "anthropic") -> dict:

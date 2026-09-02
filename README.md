@@ -29,6 +29,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python main.py
 ```
 
+On a Mac, `./deploy/setup_mac.sh` automates all of the above (plus installing `tesseract`/`poppler` for the free/OCR and PDF receipt-scanning paths) — see **README.txt** for the full quick-start and troubleshooting guide.
+
 Data is stored in a local SQLite file at `data/homeutil.db`; uploaded receipt photos go in `data/receipts/`.
 
 ## Configuration

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Edit Service &mdash; {{ vehicle.make }} {{ vehicle.model }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/vehicles">Vehicles</a>
+    <span>›</span> <a href="/vehicles/{{ vehicle.id }}">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</a>
+    <span>›</span> Edit Service
+</div>
+
+<div class="page-header">
+    <h1>Edit Service</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+    <form method="post" action="/vehicles/{{ vehicle.id }}/services/{{ record.id }}/edit">
+        <div class="form-group">
+            <label class="form-label" for="service_type">Service Type <span class="required">*</span></label>
+            <select id="service_type" name="service_type" class="form-control">
+                {% for type in service_types %}
+                <option value="{{ type }}" {% if type == selected_type %}selected{% endif %}>{{ type }}</option>
+                {% endfor %}
+            </select>
+            <div id="custom-type-row" class="custom-type-row">
+                <input type="text" name="custom_service_type" class="form-control" placeholder="Describe the service" value="{{ custom_service_type }}">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="service_date">Service Date <span class="required">*</span></label>
+                <input type="date" id="service_date" name="service_date" class="form-control" value="{{ record.service_date.isoformat() }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="mileage_at_service">Mileage</label>
+                <input type="number" id="mileage_at_service" name="mileage_at_service" class="form-control" value="{{ record.mileage_at_service if record.mileage_at_service is not none else '' }}">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="cost">Cost</label>
+                <input type="number" step="0.01" id="cost" name="cost" class="form-control" placeholder="0.00" value="{{ record.cost if record.cost is not none else '' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="service_provider">Service Provider</label>
+                <input type="text" id="service_provider" name="service_provider" class="form-control" placeholder="e.g. Jiffy Lube, Home" value="{{ record.service_provider or '' }}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Any extra details...">{{ record.notes or '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/vehicles/{{ vehicle.id }}" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

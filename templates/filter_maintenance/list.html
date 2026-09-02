@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Filter Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Filter Maintenance</h1>
+        <p>Track HVAC and air purifier filter changes.</p>
+    </div>
+    <a href="/filter-maintenance/new" class="btn btn-primary">+ Add Filter</a>
+</div>
+
+<div class="report-tabs">
+    <a class="report-tab {{ 'active' if not selected_type }}" href="/filter-maintenance">All</a>
+    {% for t in filter_types %}
+    <a class="report-tab {{ 'active' if selected_type == t }}" href="/filter-maintenance?filter_type={{ t | urlencode }}">{{ t }}</a>
+    {% endfor %}
+</div>
+
+{% if records %}
+<div class="card" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    {% if selected_type == "Air Purifier" %}
+                    <th>Model</th>
+                    <th>Filter Kind</th>
+                    <th>Change Date</th>
+                    <th>Due Date</th>
+                    <th>In Stock</th>
+                    {% elif selected_type == "HVAC" %}
+                    <th>Brand</th>
+                    <th>Changed On</th>
+                    <th>Due Date</th>
+                    <th>Size</th>
+                    {% else %}
+                    <th>Brand / Model</th>
+                    <th>Changed On</th>
+                    <th>Due Date</th>
+                    <th>Size / Kind &amp; Stock</th>
+                    {% endif %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in records %}
+                <tr>
+                    <td>{{ r.filter_type }}</td>
+                    {% if selected_type == "Air Purifier" %}
+                    <td>{{ r.model or "—" }}</td>
+                    <td>
+                        <span class="kind-badge"><span class="kind-dot {{ 'hepa' if r.filter_kind == 'HEPA' else 'carbon' }}"></span>{{ r.filter_kind or "—" }}</span>
+                    </td>
+                    <td>{{ r.changed_on.strftime("%b %d, %Y") if r.changed_on else "—" }}</td>
+                    <td>{{ r.due_date.strftime("%b %d, %Y") if r.due_date else "—" }}</td>
+                    <td>
+                        <span class="stock-pill {{ 'stock-yes' if r.in_stock else 'stock-no' }}">{{ "Yes" if r.in_stock else "No" }}</span>
+                    </td>
+                    {% elif selected_type == "HVAC" %}
+                    <td>{{ r.brand or "—" }}</td>
+                    <td>{{ r.changed_on.strftime("%b %d, %Y") if r.changed_on else "—" }}</td>
+                    <td>{{ r.due_date.strftime("%b %d, %Y") if r.due_date else "—" }}</td>
+                    <td>{{ r.size or "—" }}</td>
+                    {% else %}
+                    <td>{{ r.model if r.filter_type == "Air Purifier" else r.brand or "—" }}</td>
+                    <td>{{ r.changed_on.strftime("%b %d, %Y") if r.changed_on else "—" }}</td>
+                    <td>{{ r.due_date.strftime("%b %d, %Y") if r.due_date else "—" }}</td>
+                    <td>
+                        {% if r.filter_type == "Air Purifier" %}
+                        {{ r.filter_kind or "—" }} / <span class="stock-pill {{ 'stock-yes' if r.in_stock else 'stock-no' }}">{{ "Yes" if r.in_stock else "No" }}</span>
+                        {% else %}
+                        {{ r.size or "—" }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td>
+                        <a href="/filter-maintenance/{{ r.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
+                        <form method="post" action="/filter-maintenance/{{ r.id }}/delete"
+                              onsubmit="return confirm('Delete this filter record?');" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No filter records{{ " for " ~ selected_type if selected_type }} yet</h3>
+    <p>Add your first filter to start tracking when it was changed and when it's next due.</p>
+    <a href="/filter-maintenance/new" class="btn btn-primary">Add First Filter</a>
+</div>
+{% endif %}
+{% endblock %}

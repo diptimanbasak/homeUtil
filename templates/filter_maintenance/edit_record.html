@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Edit Filter{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/filter-maintenance">Filter Maintenance</a>
+    <span>›</span> Edit Filter
+</div>
+
+<div class="page-header">
+    <h1>Edit Filter</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+    <form method="post" action="/filter-maintenance/{{ record.id }}/edit">
+        <div class="form-group">
+            <label class="form-label" for="filter_type">Filter Type <span class="required">*</span></label>
+            <select id="filter_type" name="filter_type" class="form-control" required>
+                {% for t in filter_types %}
+                <option value="{{ t }}" {% if t == record.filter_type %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="hvac-fields" class="type-fields">
+            <div class="form-group">
+                <label class="form-label" for="brand">Brand</label>
+                <input type="text" id="brand" name="brand" class="form-control" value="{{ record.brand or '' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="size">Size</label>
+                <input type="text" id="size" name="size" class="form-control" value="{{ record.size or '' }}">
+            </div>
+        </div>
+
+        <div id="air-purifier-fields" class="type-fields">
+            <div class="form-group">
+                <label class="form-label" for="model">Model</label>
+                <input type="text" id="model" name="model" class="form-control" value="{{ record.model or '' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="filter_kind">Filter Kind <span class="required">*</span></label>
+                <select id="filter_kind" name="filter_kind" class="form-control">
+                    <option value="">Select kind</option>
+                    {% for k in filter_kinds %}
+                    <option value="{{ k }}" {% if k == record.filter_kind %}selected{% endif %}>{{ k }}</option>
+                    {% endfor %}
+                </select>
+                <p class="form-hint">Add one row per filter kind your purifier uses.</p>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="changed_on">Change Date</label>
+                <input type="date" id="changed_on" name="changed_on" class="form-control" value="{{ record.changed_on.isoformat() if record.changed_on else '' }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="due_date">Due Date</label>
+                <input type="date" id="due_date" name="due_date" class="form-control" value="{{ record.due_date.isoformat() if record.due_date else '' }}">
+            </div>
+        </div>
+
+        <div id="air-purifier-stock" class="type-fields">
+            <div class="form-group" style="margin-bottom:0.5rem;">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="in_stock" name="in_stock" {% if record.in_stock %}checked{% endif %}>
+                    <label for="in_stock">Replacement filter in stock</label>
+                </div>
+                <p class="form-hint">Check this once you've bought a spare, so you know you're covered before the due date.</p>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/filter-maintenance" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
