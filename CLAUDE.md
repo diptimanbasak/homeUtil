@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-HomeUtil — a small personal Flask app for tracking home-related stuff: vehicle maintenance, household chores, and expenses (via receipt-photo scanning, using either the Claude API or free local OCR). Runs on a home Ubuntu server via systemd, developed on a Mac. SQLite backend, server-rendered Jinja2 templates, no JS framework or build step.
+HomeUtil — a small personal Flask app for tracking home-related stuff: vehicle maintenance, household chores, and expenses (via receipt-photo scanning, using either the Claude API or free local OCR). SQLite backend, server-rendered Jinja2 templates, no JS framework or build step.
+
+**Where the code actually lives**: the home Ubuntu/Rocky server (`towmater`) is the primary dev environment, not a Mac. Two sibling directories there, each its own systemd service (see "Deploying" below):
+- `/winix/homeutil-dev` (`homeutil-dev` service, port 8001) — where development happens
+- `/winix/homeutil` (`homeutil` service, port 8000) — prod, the live app the household actually uses
+
+Mac Mini / MacBook(s) connect to `towmater` via **VSCode Remote-SSH** (Cmd+Shift+P → "Remote-SSH: Connect to Host" → open `/winix/homeutil-dev`) rather than holding a separate local working copy — the editor UI is local, the files/terminal/Claude Code session are all on towmater. GitHub (`git@github.com:diptimanbasak/homeUtil.git`) is still the git remote, used for history/backup and for the rare case of actually cloning onto a Mac, not as the main dev loop.
 
 Keep changes simple and readable — this is a small, human-maintained personal project, not a large team codebase. Prefer the existing patterns (plain Flask routes, hardcoded URL strings instead of `url_for`, direct SQLAlchemy queries) over introducing new abstractions.
 
@@ -24,10 +30,11 @@ The free/OCR receipt-scanning option (`routes/expenses.py`: "Free" radio choice)
 
 ## Deploying
 
-The app runs on a separate Ubuntu home server, not the dev machine. Two scripts in `deploy/`:
+Dev (`/winix/homeutil-dev`) and prod (`/winix/homeutil`) are two separate directories **on the same towmater box** (see "Where the code actually lives" above) — not dev-on-a-Mac/prod-on-a-server like a typical setup. Scripts in `deploy/`:
 
-- `deploy/deploy_to_ubuntu.sh user@host [remote_dir]` — run **from the Mac**. Rsyncs the repo to the remote host (excluding `.venv`, `__pycache__`, `.git`, the sqlite db, and the uploaded receipt photos) and then SSHes in to run `install.sh`. The db and receipts are excluded because they're server-side state, not code — an `rsync --delete` without those excludes would wipe them on every redeploy.
-- `deploy/install.sh` — run **on the Ubuntu box** (via the script above, or manually with sudo). (Re)creates the venv, installs `requirements.txt`, regenerates and restarts the `homeutil` systemd service, opens the firewall port.
+- `deploy/install.sh` — run **on towmater**, in whichever directory (dev or prod) you're installing/updating. (Re)creates that directory's own venv, installs `requirements.txt`, regenerates and restarts its systemd service, opens its firewall port. `SERVICE_NAME` (default `homeutil`) and `PORT` (default `8000`) are both overridable so dev and prod don't collide — dev is installed with `sudo SERVICE_NAME=homeutil-dev PORT=8001 ./deploy/install.sh`.
+- `deploy/promote_to_prod.sh` — run **on towmater, from the dev directory**, once a change there is ready to ship. Rsyncs dev → prod (excluding `.venv`, `__pycache__`, `.git`, the sqlite db, and the uploaded receipt photos — these are prod's own server-side state, not code, so an `rsync --delete` without those excludes would wipe them on every promote) then re-runs `install.sh` against the prod directory/service. Doesn't touch git — it promotes whatever's on disk in dev, committed or not; commit and push first if you want prod's checkout to match what's on GitHub.
+- `deploy/deploy_to_ubuntu.sh user@host [remote_dir]` — the older Mac→SSH→remote-host path, from back when dev lived on a Mac. Kept for deploying to a genuinely different machine (e.g. a disaster-recovery box) if that's ever needed again; not part of the normal dev→prod flow anymore.
 
 **Important**: `install.sh` regenerates `/etc/systemd/system/homeutil.service` from `deploy/homeutil.service.template` on every run, so any manual edits to that file (e.g. adding `ANTHROPIC_API_KEY`) get wiped on redeploy. Persistent env vars belong in a systemd drop-in override instead, which survives redeploys:
 
@@ -65,3 +72,9 @@ HEIC photos (default iPhone format) aren't accepted by Claude's vision API — `
 **Vehicles** (`models.py: Vehicle`/`MaintenanceRecord`/`MaintenanceReminder`): reminders are classified as `overdue` / `due_soon` / `ok` based on `REMINDER_DUE_SOON_DAYS` and `REMINDER_DUE_SOON_MILES` thresholds in `config.py`, computed in `routes/dashboard.py: _reminder_status` and reused by `routes/vehicles.py`. `MaintenanceReminder.last_service_date` is informational only (not used in the overdue/due-soon calculation, which is purely forward-looking off `due_date`/`due_mileage`) — it's just displayed so the user can see when the service was last done.
 
 **Chores** (`models.py: Chore`/`ChoreLog`): recurrence is frequency-based (`CHORE_FREQUENCIES` maps a frequency string to an interval in days), with `next_due()`/`status()` computed as model methods on `Chore` rather than stored.
+
+## Local LLM (Qwen) on towmater
+
+towmater also runs **Qwen3-8B-Q4** locally (not currently wired into HomeUtil's code — this is home infra context for future work, e.g. MCP/RAG experiments or an automated Gmail-receipt-import pipeline that was being discussed). Important constraint: **this is a text-only model, no vision capability** — it cannot read a receipt photo/PDF directly, so it's not a drop-in replacement for the `anthropic` receipt-scanning path in `receipts.py` (which needs vision). It's only useful for text-in/text-out tasks — e.g. parsing/classifying the text body of an email, or acting as a smarter parser on top of OCR'd text (similar role to, but smarter than, the regex parsing in `extract_receipt_data_ocr`).
+
+Since towmater's home server gets shut down nightly, any future integration should check the local endpoint is actually reachable first and fall back gracefully (same pattern as `receipts.py`'s handling of a missing `ANTHROPIC_API_KEY`) rather than erroring every morning before it's back up.
