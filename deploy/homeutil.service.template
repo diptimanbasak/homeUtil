@@ -1,5 +1,5 @@
 [Unit]
-Description=HomeUtil
+Description=HomeUtil ({{SERVICE_NAME}})
 After=network.target
 
 [Service]

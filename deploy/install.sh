@@ -6,10 +6,15 @@
 #   sudo ./deploy/install.sh
 #   sudo PORT=9000 ./deploy/install.sh
 #
+# SERVICE_NAME defaults to "homeutil" -- override it when installing a
+# second, separate instance on the same box (e.g. a dev copy alongside
+# prod) so this doesn't overwrite the other instance's systemd service:
+#   sudo SERVICE_NAME=homeutil-dev PORT=8001 ./deploy/install.sh
+#
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERVICE_NAME="homeutil"
+SERVICE_NAME="${SERVICE_NAME:-homeutil}"
 PORT="${PORT:-8000}"
 APP_USER="${APP_USER:-${SUDO_USER:-$(whoami)}}"
 
@@ -38,7 +43,7 @@ case "$ID ${ID_LIKE:-}" in
         ;;
 esac
 
-echo "==> Detected OS family: $OS_FAMILY (installing as user: $APP_USER, port: $PORT)"
+echo "==> Detected OS family: $OS_FAMILY (service: $SERVICE_NAME, installing as user: $APP_USER, port: $PORT)"
 
 echo "==> Installing system packages"
 if [[ "$OS_FAMILY" == "debian" ]]; then
@@ -94,6 +99,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 sed -e "s|{{APP_DIR}}|$APP_DIR|g" \
     -e "s|{{APP_USER}}|$APP_USER|g" \
     -e "s|{{PORT}}|$PORT|g" \
+    -e "s|{{SERVICE_NAME}}|$SERVICE_NAME|g" \
     "$APP_DIR/deploy/homeutil.service.template" > "$SERVICE_FILE"
 
 systemctl daemon-reload
