@@ -255,6 +255,13 @@ tr:hover td { background: #fafbfc; }
 .matrix-table th:first-child, .matrix-table td:first-child { text-align: left; }
 .matrix-table tfoot td, .matrix-table .matrix-row-total { font-weight: 700; }
 
+/* Comparison view: higher spend than the prior period is flagged as a cost
+   increase (danger/red), lower spend as a decrease (success/green) -- the
+   natural reading for a personal expense tracker. */
+.comparison-up { color: var(--color-danger); font-weight: 600; }
+.comparison-down { color: var(--color-success); font-weight: 600; }
+.comparison-flat { color: var(--color-text-muted); }
+
 /* Filter Maintenance: HVAC vs. Air Purifier conditional form fields */
 .type-fields { display: none; }
 .type-fields.visible { display: block; }

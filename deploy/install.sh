@@ -46,7 +46,10 @@ if [[ "$OS_FAMILY" == "debian" ]]; then
     apt-get install -y python3 python3-venv python3-pip ufw tesseract-ocr poppler-utils
 else
     PKG_MGR=$(command -v dnf || command -v yum)
-    "$PKG_MGR" install -y python3 python3-pip firewalld tesseract poppler-utils
+    # python3.11 alongside the system python3 -- RHEL/Rocky/CentOS's default
+    # python3 is frequently 3.9 (see below), which is too old for this
+    # codebase's `str | None` (PEP 604) type hints.
+    "$PKG_MGR" install -y python3 python3-pip python3.11 firewalld tesseract poppler-utils
     systemctl enable --now firewalld
 fi
 
@@ -55,7 +58,30 @@ if [[ -d "$APP_DIR/.venv" ]]; then
     echo "    Removing existing .venv (a venv copied from another machine/OS won't run here)"
     rm -rf "$APP_DIR/.venv"
 fi
-sudo -u "$APP_USER" python3 -m venv "$APP_DIR/.venv"
+
+# Pick the newest available Python 3.10+ interpreter -- this codebase uses
+# `str | None` union-type syntax (PEP 604), which 3.9 can't parse at all
+# (hard TypeError at import time, not just a lint warning). Plain `python3`
+# on RHEL/Rocky/CentOS commonly still resolves to 3.9, so check newest-first
+# rather than assuming `python3` is new enough.
+PYTHON_BIN=""
+for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$candidate" &>/dev/null; then
+        version=$("$candidate" -c 'import sys; print(sys.version_info[:2] >= (3, 10))')
+        if [[ "$version" == "True" ]]; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    fi
+done
+if [[ -z "$PYTHON_BIN" ]]; then
+    echo "ERROR: no Python 3.10+ interpreter found (checked python3.13/3.12/3.11/3.10/python3)." >&2
+    echo "This codebase requires 3.10+ for 'str | None' type hints. Install one (e.g. 'dnf install python3.11') and re-run." >&2
+    exit 1
+fi
+echo "    Using $PYTHON_BIN ($("$PYTHON_BIN" --version))"
+
+sudo -u "$APP_USER" "$PYTHON_BIN" -m venv "$APP_DIR/.venv"
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install --upgrade pip
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 

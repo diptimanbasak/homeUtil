@@ -18,6 +18,8 @@ python main.py                    # runs on 0.0.0.0:8000 by default (config.py: 
 
 There is no test suite, linter, or build step configured for this project.
 
+**Requires Python 3.10+** (the codebase uses `str | None` union-type hints, PEP 604 — a hard `TypeError` at import time on 3.9, not just a lint warning). On RHEL/Rocky/CentOS, the default `python3` is frequently still 3.9 — `deploy/install.sh` picks the newest available 3.10+ interpreter (checking `python3.13`/`3.12`/`3.11`/`3.10`/`python3` in that order) rather than assuming plain `python3` is new enough.
+
 The free/OCR receipt-scanning option (`routes/expenses.py`: "Free" radio choice) needs the `tesseract-ocr` system binary, not just the `pytesseract` pip package — `brew install tesseract` on the Mac, or `apt-get install tesseract-ocr` on the Ubuntu server (already added to `deploy/install.sh`). PDF support for that same OCR path additionally needs `poppler` (`brew install poppler` / `apt-get install poppler-utils`), used by `pdf2image` to rasterize the first page.
 
 ## Deploying
@@ -37,6 +39,8 @@ Environment=ANTHROPIC_API_KEY=sk-ant-...
 EOF
 sudo systemctl daemon-reload && sudo systemctl restart homeutil
 ```
+
+**Backups**: `deploy/backup.sh` — run **on the Ubuntu box** as root (e.g. via cron). Tars up `data/homeutil.db`, `data/receipts/`, and the systemd override above (the only things that aren't reproducible from git + `install.sh`) into a dated archive under `BACKUP_DIR` (default `/winix/homeutil-backups`), pruning anything older than `RETENTION_DAYS` (default 14). Writes locally only — copy `BACKUP_DIR` off the box periodically (another disk, cloud storage) so a disk failure or reformat can't take out the live data and its backup at the same time.
 
 **Schema changes require manual migration.** `Base.metadata.create_all()` (called on every app startup in `main.py`) only creates missing tables — it never alters existing ones. Adding a column to an existing model means running `ALTER TABLE ... ADD COLUMN ...` by hand against `data/homeutil.db` on the server (there's no migration framework/Alembic in this project — keep it that way unless the data volume genuinely justifies it). To catch a forgotten migration before it surfaces as a confusing 500 on some random route, `database.py: check_schema_is_current()` runs right after `create_all()` on every startup: it inspects each existing table's actual columns against what the model expects, and if any are missing it prints the exact `ALTER TABLE` statement(s) needed and exits with a non-zero code instead of starting the app.
 

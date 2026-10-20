@@ -466,7 +466,49 @@ def _line_chart_points(monthly_totals, width=600, height=220, pad=30):
     return points, [f"{p['x']},{p['y']}" for p in points]
 
 
-VALID_REPORT_VIEWS = ["pie", "line", "date", "category", "matrix"]
+def _category_comparison(date_wise):
+    """Categorywise cost comparison between the two most recent month
+    buckets in `date_wise` (chronological, same buckets as the Date-wise/
+    Matrix views) -- e.g. this month vs last month, so the user can see at
+    a glance which categories went up or down and by how much."""
+    if len(date_wise) < 2:
+        return None
+
+    (prev_label, prev_expenses), (curr_label, curr_expenses) = date_wise[-2:]
+    prev_totals = _category_totals(prev_expenses)
+    curr_totals = _category_totals(curr_expenses)
+
+    categories = [c for c in EXPENSE_CATEGORIES if prev_totals.get(c) or curr_totals.get(c)]
+    rows = []
+    for cat in categories:
+        prev_amount = prev_totals.get(cat, 0.0)
+        curr_amount = curr_totals.get(cat, 0.0)
+        change = curr_amount - prev_amount
+        if prev_amount:
+            pct_change = change / prev_amount * 100
+        else:
+            pct_change = 100.0 if curr_amount else 0.0
+        rows.append({
+            "category": cat,
+            "prev_amount": prev_amount,
+            "curr_amount": curr_amount,
+            "change": change,
+            "pct_change": pct_change,
+        })
+
+    # Biggest increases first, so cost blowups surface at the top.
+    rows.sort(key=lambda r: r["change"], reverse=True)
+
+    return {
+        "prev_label": prev_label,
+        "curr_label": curr_label,
+        "rows": rows,
+        "prev_total": sum(prev_totals.values()),
+        "curr_total": sum(curr_totals.values()),
+    }
+
+
+VALID_REPORT_VIEWS = ["pie", "line", "date", "category", "matrix", "comparison"]
 
 
 @bp.route("/report")
@@ -509,6 +551,8 @@ def category_report():
         for cat in matrix_categories
     }
 
+    comparison = _category_comparison(date_wise)
+
     return render_template(
         "expenses/report.html",
         view=view,
@@ -524,8 +568,10 @@ def category_report():
         matrix_rows=matrix_rows,
         matrix_categories=matrix_categories,
         matrix_column_totals=matrix_column_totals,
+        comparison=comparison,
         categories=EXPENSE_CATEGORIES,
         filters=request.args,
+        filter_args={k: v for k, v in request.args.items() if k != "view"},
     )
 
 

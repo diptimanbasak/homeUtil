@@ -44,7 +44,7 @@
 </form>
 
 {% macro tab_url(v) -%}
-/expenses/report?{{ filters|urlencode }}{{ '&' if filters }}view={{ v }}
+/expenses/report?{{ filter_args|urlencode }}{{ '&' if filter_args }}view={{ v }}
 {%- endmacro %}
 
 <div class="report-tabs">
@@ -53,6 +53,7 @@
     <a class="report-tab {{ 'active' if view == 'date' }}" href="{{ tab_url('date') }}">Date-wise</a>
     <a class="report-tab {{ 'active' if view == 'category' }}" href="{{ tab_url('category') }}">Category-wise</a>
     <a class="report-tab {{ 'active' if view == 'matrix' }}" href="{{ tab_url('matrix') }}">Monthly &times; Category</a>
+    <a class="report-tab {{ 'active' if view == 'comparison' }}" href="{{ tab_url('comparison') }}">Comparison</a>
 </div>
 
 {% if not breakdown %}
@@ -221,6 +222,55 @@
         </table>
     </div>
 </div>
+{% elif view == 'comparison' %}
+{% if not comparison %}
+<div class="empty-state">
+    <h3>Not enough data yet</h3>
+    <p>Comparison needs at least two months of expenses to show month-over-month change.</p>
+</div>
+{% else %}
+<div class="card-title" style="margin-top:0;">{{ comparison.curr_label }} vs {{ comparison.prev_label }}</div>
+<div class="card expense-card-hover" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>{{ comparison.curr_label }}</th>
+                    <th>{{ comparison.prev_label }}</th>
+                    <th>Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in comparison.rows %}
+                <tr class="expense-row" style="--i:{{ loop.index0 }};">
+                    <td>
+                        <span class="category-badge" style="background:{{ category_colors.get(row.category, '#94a3b8') }}22;color:{{ category_colors.get(row.category, '#94a3b8') }};">{{ row.category }}</span>
+                    </td>
+                    <td><strong>{{ row.curr_amount | currency }}</strong></td>
+                    <td>{{ row.prev_amount | currency }}</td>
+                    <td class="{{ 'comparison-up' if row.change > 0 else ('comparison-down' if row.change < 0 else 'comparison-flat') }}">
+                        {{ '▲' if row.change > 0 else ('▼' if row.change < 0 else '—') }}
+                        {{ row.change | abs | currency }} ({{ "%.1f"|format(row.pct_change | abs) }}%)
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td>
+                    <td>{{ comparison.curr_total | currency }}</td>
+                    <td>{{ comparison.prev_total | currency }}</td>
+                    <td class="{{ 'comparison-up' if comparison.curr_total > comparison.prev_total else ('comparison-down' if comparison.curr_total < comparison.prev_total else 'comparison-flat') }}">
+                        {{ '▲' if comparison.curr_total > comparison.prev_total else ('▼' if comparison.curr_total < comparison.prev_total else '—') }}
+                        {{ (comparison.curr_total - comparison.prev_total) | abs | currency }}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endif %}
 
 {% endif %}
