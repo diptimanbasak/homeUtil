@@ -1,9 +1,16 @@
 HomeUtil -- Mac Setup & Quick Start
 ====================================
 
-This file covers running HomeUtil on a Mac -- either to quickly get it
-up and running on a machine, or to develop on it on a second Macbook.
-For deploying to the Ubuntu home server, see README.md instead.
+This file covers running a STANDALONE local copy of HomeUtil on a Mac --
+e.g. to quickly try it out, or test something fully offline.
+
+For actual development, don't use this -- the home server (towmater) is
+now the primary dev environment. Connect to it via VSCode Remote-SSH and
+edit the live dev copy at /winix/homeutil-dev directly; see README.md's
+"Where the code lives" section and CLAUDE.md for the full setup. This
+file's standalone-Mac setup is a separate, disconnected copy with its
+own local data/ -- it won't see your real expenses/vehicles/chores, and
+changes here don't sync anywhere.
 
 
 QUICK START (one command)

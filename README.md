@@ -2,6 +2,8 @@
 
 A personal home management dashboard: vehicle maintenance tracking, household chore scheduling, and expense tracking via receipt-photo scanning.
 
+**Primary development happens on the home server itself**, not a Mac — see "Where the code lives" below. This README still covers running a standalone copy locally (e.g. on a Mac, for a quick look or fully offline testing); see **README.txt** for that quick-start.
+
 ## Features
 
 - **Vehicles** — track vehicles, log service history, and set maintenance reminders (due by date and/or mileage, with overdue/due-soon status).
@@ -33,6 +35,17 @@ On a Mac, `./deploy/setup_mac.sh` automates all of the above (plus installing `t
 
 Data is stored in a local SQLite file at `data/homeutil.db`; uploaded receipt photos go in `data/receipts/`.
 
+## Where the code lives
+
+The home server (`towmater`) is the primary dev environment — not a Mac. It runs two sibling copies, each its own systemd service:
+
+- `/winix/homeutil-dev` (`homeutil-dev` service, port 8001) — development
+- `/winix/homeutil` (`homeutil` service, port 8000) — production, the live app
+
+Edit the dev copy via **VSCode Remote-SSH** from any Mac (`Cmd+Shift+P` → "Remote-SSH: Connect to Host" → open `/winix/homeutil-dev`), rather than cloning the repo locally — no sync step, you're editing the real files directly. GitHub (`git@github.com:diptimanbasak/homeUtil.git`) is the git remote, kept for history/backup rather than as the main edit→deploy loop. See `CLAUDE.md` for the full architecture/workflow notes.
+
+A small local LLM (Qwen3-8B-Q4, text-only — no image/vision support) also runs on towmater for other home-automation experiments; it's not currently wired into HomeUtil itself.
+
 ## Configuration
 
 All environment variables (with defaults) live in `config.py`:
@@ -47,18 +60,24 @@ All environment variables (with defaults) live in `config.py`:
 | `REMINDER_DUE_SOON_DAYS` | `30` | Days-out threshold for "due soon" vehicle reminders |
 | `REMINDER_DUE_SOON_MILES` | `500` | Mileage threshold for "due soon" vehicle reminders |
 
-## Deploying to a home server
+## Deploying (dev → prod, both on towmater)
 
-Two scripts in `deploy/` handle installing this as a systemd service on Ubuntu/Debian or RHEL-family Linux:
+Scripts in `deploy/` handle installing this as a systemd service and promoting a dev change to production. Both dev and prod live on the same box (see "Where the code lives" above), so this is a local operation on towmater, not a Mac-to-server push:
 
 ```bash
-# From your Mac/dev machine:
-./deploy/deploy_to_ubuntu.sh user@your-server [remote_dir]
+# One-off / rebuild a venv + systemd service, run from either directory:
+sudo SERVICE_NAME=homeutil-dev PORT=8001 ./deploy/install.sh   # dev
+sudo ./deploy/install.sh                                        # prod (defaults: homeutil, 8000)
+
+# Ship a dev change to prod, run from the dev directory:
+sudo ./deploy/promote_to_prod.sh
 ```
 
-This rsyncs the code over and runs `deploy/install.sh` on the remote host, which sets up a Python venv, installs dependencies, and registers/starts a `homeutil` systemd service.
+`promote_to_prod.sh` rsyncs dev → prod (never touching prod's `data/homeutil.db` or `data/receipts/` — those are server-side state, not code) then re-runs `install.sh` against prod.
 
-To set `ANTHROPIC_API_KEY` on the server persistently (survives future redeploys), use a systemd override rather than editing the generated service file directly:
+`deploy/deploy_to_ubuntu.sh user@host [remote_dir]` still exists for the (now rare) case of deploying to a genuinely different machine over SSH.
+
+To set `ANTHROPIC_API_KEY` persistently (survives future `install.sh` runs), use a systemd override rather than editing the generated service file directly:
 
 ```bash
 sudo mkdir -p /etc/systemd/system/homeutil.service.d
@@ -69,10 +88,14 @@ EOF
 sudo systemctl daemon-reload && sudo systemctl restart homeutil
 ```
 
-Useful commands on the server:
+Useful commands on the server (swap `homeutil` for `homeutil-dev` for the dev instance):
 
 ```bash
 sudo systemctl status homeutil
 sudo journalctl -u homeutil -f      # tail logs
 sudo systemctl restart homeutil
 ```
+
+## Backups
+
+`deploy/backup.sh`, run as root on towmater (e.g. via cron), tars up `data/homeutil.db`, `data/receipts/`, and the systemd override above into a dated archive under `/winix/homeutil-backups` (14-day retention by default). Writes locally only — copy it off-box periodically. See `CLAUDE.md` for details.

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# One-shot setup for running HomeUtil locally on a Mac (Apple Silicon or
-# Intel) -- either the home server Mac you want up and running quickly, or
-# a second Macbook you're developing on. This does NOT install a systemd
-# service (that's Ubuntu-only, see deploy/install.sh) -- on a Mac this just
-# gets dependencies installed and runs the dev server in the foreground,
-# matching the "Running locally" instructions in CLAUDE.md.
+# One-shot setup for running a STANDALONE local copy of HomeUtil on a Mac
+# (Apple Silicon or Intel) -- e.g. to quickly try it out or test something
+# fully offline. This is NOT the primary dev setup: actual development
+# happens on the home server (towmater) itself via VSCode Remote-SSH, see
+# README.md's "Where the code lives" section and CLAUDE.md. This does NOT
+# install a systemd service (that's Linux-only, see deploy/install.sh) --
+# on a Mac this just gets dependencies installed and runs the dev server
+# in the foreground, matching the "Running locally" instructions in
+# CLAUDE.md, against its own separate local data/ (won't see towmater's
+# real data).
 #
 # Usage:
 #   ./deploy/setup_mac.sh                 # set up (if needed) and start the server
